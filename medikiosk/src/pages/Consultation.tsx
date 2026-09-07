@@ -1,0 +1,996 @@
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, Navigate } from 'react-router-dom';
+import {
+  Mic,
+  MicOff,
+  Volume2,
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle2,
+  Leaf,
+  Sparkles,
+  MapPin
+} from 'lucide-react';
+import { usePatientStore } from '../store/usePatientStore';
+import {
+  CHIEF_COMPLAINT_PRESETS,
+  SOCRATES_OPTIONS,
+  FEVER_OPTIONS,
+} from '../data/clinicalProtocols';
+import { AYURVEDA_QUESTION_TREE, getStartingQuestionId } from '../data/ayurvedicProtocols';
+import { speakPrompt, createSpeechRecognizer } from '../utils/speechVoice';
+
+export default function Consultation() {
+  const navigate = useNavigate();
+  const { currentPatient, currentProfile, updatePatient, evaluateTriageAndSummary, saveToDatabase, soundEnabled } =
+    usePatientStore();
+
+  if (!currentProfile) {
+    return <Navigate to="/patient/login" replace />;
+  }
+
+  const isHindi = currentPatient.language === 'hi';
+  const isAyush = currentPatient.mode === 'ayush';
+
+  // Unified single-question Typeform step index
+  const [currentStep, setCurrentStep] = useState(0);
+
+  // Voice recording state
+  const [isListening, setIsListening] = useState(false);
+  const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
+  const recognizerRef = useRef<any>(null);
+
+  // Form states
+  const [chiefComplaintText, setChiefComplaintText] = useState(currentPatient.chiefComplaint || '');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const [duration, setDuration] = useState(currentPatient.symptomDuration || '');
+  const [site, setSite] = useState(currentPatient.symptomSite || '');
+  const [character, setCharacter] = useState(currentPatient.symptomCharacter || '');
+  const [radiation, setRadiation] = useState(currentPatient.symptomRadiation || '');
+  const [severity, setSeverity] = useState(currentPatient.symptomSeverity || 6);
+  const [associated, setAssociated] = useState<string[]>(currentPatient.associatedSymptoms || []);
+  const [customAssociated, setCustomAssociated] = useState('');
+  const [aggravating, setAggravating] = useState(currentPatient.aggravatingFactors || '');
+  const [relieving, setRelieving] = useState(currentPatient.relievingFactors || '');
+
+  // AYUSH states
+  const [prakriti, setPrakriti] = useState(currentPatient.prakriti || '');
+  const [agni, setAgni] = useState(currentPatient.agni || '');
+  const [koshtha, setKoshtha] = useState(currentPatient.koshtha || '');
+  const [aharaVihara, setAharaVihara] = useState(currentPatient.aharaVihara || '');
+  const [nidra, setNidra] = useState(currentPatient.nidra || '');
+  const [activeAyushQuestionId, setActiveAyushQuestionId] = useState<string>('q_gastro_start');
+  const [ayushResponses, setAyushResponses] = useState<{ qId: string; answer: string; dosha: string }[]>(
+    currentPatient.ayushResponses || []
+  );
+  const [ayushCompleted, setAyushCompleted] = useState(false);
+
+  // Check if current complaint is fever-related to adapt question matrix
+  const isFever =
+    selectedCategory === 'fever_infections' ||
+    chiefComplaintText.toLowerCase().includes('fever') ||
+    chiefComplaintText.toLowerCase().includes('बुखार') ||
+    chiefComplaintText.toLowerCase().includes('chill') ||
+    chiefComplaintText.toLowerCase().includes('temperature');
+
+  const currentOptions = isFever ? FEVER_OPTIONS : SOCRATES_OPTIONS;
+  const totalSteps = isAyush ? 5 : 8;
+
+  // Determine Ayush Start node based on complaint
+  useEffect(() => {
+    if (isAyush && currentStep === 1 && !ayushCompleted) {
+      let catId = 'gastro_ayush';
+      for (const cat of CHIEF_COMPLAINT_PRESETS) {
+        if (cat.commonComplaints.some(c => c.textEn === chiefComplaintText || c.textHi === chiefComplaintText)) {
+          catId = cat.id;
+          break;
+        }
+      }
+      setActiveAyushQuestionId(getStartingQuestionId(catId));
+    }
+  }, [currentStep, isAyush, chiefComplaintText, ayushCompleted]);
+
+  // Read aloud prompt when step changes
+  useEffect(() => {
+    if (!soundEnabled) return;
+
+    let textToSpeak = '';
+    if (currentStep === 0) {
+      textToSpeak = isHindi
+        ? 'कृपया अपनी मुख्य परेशानी बताएं या बोलें।'
+        : 'Please describe your main health concern today, or select one below.';
+    } else if (!isAyush) {
+      if (currentStep === 1) {
+        textToSpeak = isHindi
+          ? isFever ? 'बुखार कब से शुरू हुआ है?' : 'यह तकलीफ कब से शुरू हुई?'
+          : isFever ? 'When did the fever first start?' : 'When did these symptoms first start?';
+      } else if (currentStep === 2) {
+        textToSpeak = isHindi
+          ? isFever ? 'बुखार कैसा महसूस हो रहा है? क्या कंपकंपी है?' : 'तकलीफ का अहसास कैसा है? क्या यह भारी दबाव है या तेज जलन?'
+          : isFever ? 'How does the fever feel? Is there shivering or body ache?' : 'What does the discomfort feel like?';
+      } else if (currentStep === 3) {
+        textToSpeak = isHindi
+          ? isFever ? 'बुखार का असर शरीर के किन हिस्सों में ज्यादा है?' : 'क्या यह दर्द शरीर में कहीं और भी फैलता है?'
+          : isFever ? 'Which parts of your body are most affected by the fever?' : 'Does the pain spread anywhere else?';
+      } else if (currentStep === 4) {
+        textToSpeak = isHindi
+          ? 'तकलीफ की तीव्रता एक से दस के पैमाने पर कितनी है?'
+          : 'On a scale from 1 to 10, how severe is your discomfort?';
+      } else if (currentStep === 5) {
+        textToSpeak = isHindi ? 'क्या साथ में कोई अन्य लक्षण भी हैं?' : 'Are you experiencing any other associated symptoms?';
+      } else if (currentStep === 6) {
+        textToSpeak = isHindi ? 'तकलीफ किस चीज से बढ़ती है?' : 'What makes your symptoms worse?';
+      } else if (currentStep === 7) {
+        textToSpeak = isHindi ? 'किस चीज से आराम मिलता है?' : 'What provides relief?';
+      }
+    } else if (isAyush) {
+      if (currentStep === 1 && !ayushCompleted) {
+        const q = AYURVEDA_QUESTION_TREE[activeAyushQuestionId];
+        textToSpeak = q ? (isHindi ? q.questionHi : q.questionEn) : '';
+      } else if (currentStep === 2) {
+        textToSpeak = isHindi ? 'अपने आहार और दिनचर्या के बारे में बताएं।' : 'Please describe your diet and daily lifestyle habits.';
+      } else if (currentStep === 3) {
+        textToSpeak = isHindi ? 'आपकी नींद की गुणवत्ता कैसी है?' : 'How is your sleep quality?';
+      }
+    }
+
+    if (textToSpeak) {
+      speakPrompt(textToSpeak, currentPatient.language);
+    }
+  }, [currentStep, soundEnabled, isHindi, isAyush, isFever, currentPatient.language, activeAyushQuestionId, ayushCompleted]);
+
+  // Voice recording toggle for any field
+  const toggleVoice = (fieldName: string, setter: (val: string) => void) => {
+    if (isListening && activeVoiceField === fieldName) {
+      if (recognizerRef.current) recognizerRef.current.stop();
+      setIsListening(false);
+      setActiveVoiceField(null);
+      return;
+    }
+
+    setActiveVoiceField(fieldName);
+    const recognizer = createSpeechRecognizer(currentPatient.language, {
+      onResult: (transcript) => {
+        setter(transcript);
+        setIsListening(false);
+        setActiveVoiceField(null);
+      },
+      onError: () => {
+        setIsListening(false);
+        setActiveVoiceField(null);
+      },
+      onEnd: () => {
+        setIsListening(false);
+        setActiveVoiceField(null);
+      },
+    });
+
+    if (recognizer) {
+      recognizerRef.current = recognizer;
+      recognizer.start();
+      setIsListening(true);
+    }
+  };
+
+  // Sync to store & advance
+  const advance = (nextStepIndex?: number) => {
+    const nextIdx = nextStepIndex !== undefined ? nextStepIndex : currentStep + 1;
+
+    const finalAssociated = [...associated];
+    if (customAssociated.trim() && !finalAssociated.includes(customAssociated.trim())) {
+      finalAssociated.push(customAssociated.trim());
+    }
+
+    updatePatient({
+      chiefComplaint: chiefComplaintText,
+      symptomDuration: duration,
+      symptomSite: site,
+      symptomCharacter: character,
+      symptomRadiation: radiation,
+      symptomSeverity: severity,
+      aggravatingFactors: aggravating,
+      relievingFactors: relieving,
+      associatedSymptoms: finalAssociated,
+      prakriti,
+      agni,
+      koshtha,
+      aharaVihara,
+      nidra,
+      ayushResponses,
+      status: 'waiting'
+    });
+
+    if (nextIdx < totalSteps) {
+      setCurrentStep(nextIdx);
+    } else {
+      // Complete intake & route
+      evaluateTriageAndSummary();
+      saveToDatabase();
+      navigate('/summary');
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setCurrentStep((prev) => prev - 1);
+    } else {
+      navigate('/patient/dashboard');
+    }
+  };
+
+  // Auto-advance helper on option tap
+  const pickAndAdvance = (setter: (val: any) => void, value: any) => {
+    setter(value);
+    setTimeout(() => {
+      advance();
+    }, 280);
+  };
+
+  return (
+    <div className="min-h-[85vh] flex flex-col justify-between max-w-2xl mx-auto px-4 py-6">
+      
+      {/* 1. Top Header with Hospital Badge & Step Progress */}
+      <div className="w-full mb-6">
+        <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-blue-700 bg-blue-50/80 px-2.5 py-0.5 rounded-md border border-blue-200/70 font-semibold flex items-center gap-1">
+              <MapPin size={11} />
+              {currentPatient.hospitalCode || 'HOSP-OPD'} • {currentPatient.doctorNumber || 'OPD Desk'}
+            </span>
+            <span className="text-slate-300">•</span>
+            <span className="text-slate-600 font-medium">
+              {isHindi ? 'प्रश्न' : 'Question'} {currentStep + 1} of {totalSteps}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              speakPrompt(
+                isHindi ? 'प्रश्न को ध्यान से सुनें' : 'Please listen carefully to the question',
+                currentPatient.language
+              );
+            }}
+            className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors"
+            title="Read Question Aloud"
+          >
+            <Volume2 size={15} />
+            <span className="text-[11px] hidden sm:inline">{isHindi ? 'सुनें' : 'Listen'}</span>
+          </button>
+        </div>
+
+        {/* Crisp Modern Linear Progress Bar */}
+        <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden">
+          <div
+            className="bg-blue-600 h-full transition-all duration-300 rounded-full"
+            style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* 2. Main Single Question Stage */}
+      <div className="flex-1 flex flex-col justify-center">
+
+        {/* STEP 0: Chief Complaint */}
+        {currentStep === 0 && (
+          <div className="space-y-5">
+            <div className="text-left">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 block mb-1">
+                {isHindi ? 'चरण 1: मुख्य स्वास्थ्य समस्या' : 'Section 1: Chief Complaint'}
+              </span>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                {isHindi ? 'आज आपकी मुख्य समस्या क्या है?' : 'What is your main health concern today?'}
+              </h1>
+              <p className="text-xs text-slate-500 mt-1">
+                {isHindi
+                  ? 'माइक दबाकर बोलें, टाइप करें या नीचे से उपयुक्त लक्षण चुनें।'
+                  : 'Speak using the microphone, type below, or select from common complaints.'}
+              </p>
+            </div>
+
+            {/* Input with Voice Dictation */}
+            <div className="relative">
+              <textarea
+                rows={3}
+                value={chiefComplaintText}
+                onChange={(e) => setChiefComplaintText(e.target.value)}
+                placeholder={
+                  isHindi
+                    ? 'उदा. 2 दिनों से तेज बुखार है, कंपकंपी आ रही है और पूरे बदन में दर्द है...'
+                    : 'e.g. High fever with shivering chills, severe bodyache and weakness for 2 days...'
+                }
+                className="w-full p-4 pr-14 bg-white rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-3 focus:ring-blue-600/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none resize-none transition-all shadow-xs"
+              />
+              <button
+                type="button"
+                onClick={() => toggleVoice('chiefComplaint', setChiefComplaintText)}
+                className={`absolute right-3 bottom-3 p-2.5 rounded-lg transition-colors ${
+                  isListening && activeVoiceField === 'chiefComplaint'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-slate-900 hover:bg-slate-800 text-white shadow-xs'
+                }`}
+                title={isListening ? 'Stop Listening' : 'Speak to Type'}
+              >
+                {isListening && activeVoiceField === 'chiefComplaint' ? <MicOff size={17} /> : <Mic size={17} />}
+              </button>
+            </div>
+
+            {isListening && activeVoiceField === 'chiefComplaint' && (
+              <div className="text-xs font-semibold text-red-600 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+                <span>{isHindi ? 'रिकॉर्डिंग चालू है... बोलें' : 'Listening... speak clearly'}</span>
+              </div>
+            )}
+
+            {/* Categorized Complaint Selectors */}
+            <div>
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-2">
+                {isHindi ? 'सामान्य लक्षण श्रेणियां:' : 'Common Symptom Categories:'}
+              </span>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                {[
+                  { id: 'fever_infections', labelEn: '🌡️ Fever & Chills', labelHi: '🌡️ बुखार और संक्रमण' },
+                  { id: 'cardiorespiratory', labelEn: '🫀 Chest & Breathing', labelHi: '🫀 सीना और सांस' },
+                  { id: 'gastro_ayush', labelEn: '🩺 Stomach & Digestion', labelHi: '🩺 पेट और पाचन' },
+                  { id: 'neuro_joint', labelEn: '🦴 Joints & Headache', labelHi: '🦴 जोड़, कमर व सिरदर्द' },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
+                    className={`p-3 rounded-lg border text-xs font-medium transition-all text-left flex items-center justify-between ${
+                      selectedCategory === cat.id
+                        ? 'bg-blue-50 border-blue-600 text-blue-900 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/80'
+                    }`}
+                  >
+                    <span>{isHindi ? cat.labelHi : cat.labelEn}</span>
+                    <span className="text-slate-400 text-[10px]">{selectedCategory === cat.id ? '▲' : '▼'}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Sub-complaints for selected category */}
+              {selectedCategory && (
+                <div className="mt-3 p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-2">
+                  <span className="text-[11px] font-semibold text-slate-700 block">
+                    {isHindi ? 'विशिष्ट लक्षण चुनें:' : 'Select specific symptom:'}
+                  </span>
+                  <div className="flex flex-col gap-1.5">
+                    {CHIEF_COMPLAINT_PRESETS.find((c) => c.id === selectedCategory)?.commonComplaints.map(
+                      (item, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setChiefComplaintText(isHindi ? item.textHi : item.textEn);
+                            setSite(item.defaultSite);
+                            advance();
+                          }}
+                          className="p-3 text-xs text-left font-semibold text-slate-800 bg-white hover:bg-teal-600 hover:text-white rounded-xl border border-slate-200 transition-colors shadow-2xs"
+                        >
+                          {isHindi ? item.textHi : item.textEn}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 1: Onset & Duration */}
+        {currentStep === 1 && !isAyush && (
+          <div className="animate-slide-up space-y-6">
+            <div className="text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
+                {isHindi ? 'कदम 2: अवधि' : 'Step 2: Onset & Duration'}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                {isHindi
+                  ? isFever ? 'बुखार या तकलीफ कब से शुरू हुई?' : 'यह तकलीफ कब से शुरू हुई?'
+                  : isFever ? 'When did the fever or symptoms start?' : 'When did these symptoms first start?'}
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+              {currentOptions.onset.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => pickAndAdvance(setDuration, isHindi ? opt.labelHi : opt.labelEn)}
+                  className={`p-4 rounded-2xl border-2 text-sm sm:text-base font-bold transition-all text-center ${
+                    duration === (isHindi ? opt.labelHi : opt.labelEn)
+                      ? 'bg-teal-50 border-teal-600 text-teal-800 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-teal-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {isHindi ? opt.labelHi : opt.labelEn}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Input or Speak your own */}
+            <div className="max-w-lg mx-auto p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-2">
+              <input
+                type="text"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder={isHindi ? 'या अपनी भाषा में लिखें (उदा. कल रात 8 बजे से)...' : 'Or type your exact duration (e.g. since yesterday 8 PM)...'}
+                className="flex-1 bg-transparent text-xs sm:text-sm font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => toggleVoice('duration', setDuration)}
+                className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
+                  isListening && activeVoiceField === 'duration'
+                    ? 'bg-red-600 text-white animate-pulse'
+                    : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
+                }`}
+              >
+                <Mic size={15} />
+                <span className="hidden sm:inline">{isListening && activeVoiceField === 'duration' ? 'Listening' : 'Speak'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2: Character of Discomfort */}
+        {currentStep === 2 && !isAyush && (
+          <div className="animate-slide-up space-y-6">
+            <div className="text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
+                {isHindi ? 'कदम 3: अहसास का प्रकार' : 'Step 3: Character & Sensation'}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                {isHindi
+                  ? isFever ? 'बुखार और तकलीफ का अहसास कैसा है?' : 'तकलीफ का अहसास कैसा है?'
+                  : isFever ? 'How does the fever feel?' : 'What does the sensation feel like?'}
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+              {currentOptions.character.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => pickAndAdvance(setCharacter, isHindi ? opt.labelHi : opt.labelEn)}
+                  className={`p-4 rounded-2xl border-2 text-sm sm:text-base font-bold transition-all text-center ${
+                    character === (isHindi ? opt.labelHi : opt.labelEn)
+                      ? 'bg-teal-50 border-teal-600 text-teal-800 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-teal-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {isHindi ? opt.labelHi : opt.labelEn}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Input / Speech for Character */}
+            <div className="max-w-lg mx-auto p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-2">
+              <input
+                type="text"
+                value={character}
+                onChange={(e) => setCharacter(e.target.value)}
+                placeholder={isHindi ? 'या बोलें/लिखें कि कैसा महसूस हो रहा है...' : 'Or speak/type how it feels in your own words...'}
+                className="flex-1 bg-transparent text-xs sm:text-sm font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => toggleVoice('character', setCharacter)}
+                className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
+                  isListening && activeVoiceField === 'character'
+                    ? 'bg-red-600 text-white animate-pulse'
+                    : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
+                }`}
+              >
+                <Mic size={15} />
+                <span className="hidden sm:inline">{isListening && activeVoiceField === 'character' ? 'Listening' : 'Speak'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3: Radiation / Affected Regions */}
+        {currentStep === 3 && !isAyush && (
+          <div className="animate-slide-up space-y-6">
+            <div className="text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
+                {isHindi ? 'कदम 4: फैलाव / प्रभावित अंग' : 'Step 4: Affected Regions & Spread'}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                {isHindi
+                  ? isFever ? 'असर शरीर के किन हिस्सों में ज्यादा महसूस हो रहा है?' : 'क्या दर्द शरीर में कहीं और फैलता है?'
+                  : isFever ? 'Which regions are most affected by the illness?' : 'Does the discomfort spread anywhere else?'}
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+              {currentOptions.radiation.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => pickAndAdvance(setRadiation, isHindi ? opt.labelHi : opt.labelEn)}
+                  className={`p-4 rounded-2xl border-2 text-sm sm:text-base font-bold transition-all text-center ${
+                    radiation === (isHindi ? opt.labelHi : opt.labelEn)
+                      ? 'bg-teal-50 border-teal-600 text-teal-800 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-teal-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {isHindi ? opt.labelHi : opt.labelEn}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Input / Speech */}
+            <div className="max-w-lg mx-auto p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-2">
+              <input
+                type="text"
+                value={radiation}
+                onChange={(e) => setRadiation(e.target.value)}
+                placeholder={isHindi ? 'या अंग/हिस्सा बोलें या टाइप करें...' : 'Or type / speak the affected areas...'}
+                className="flex-1 bg-transparent text-xs sm:text-sm font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => toggleVoice('radiation', setRadiation)}
+                className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
+                  isListening && activeVoiceField === 'radiation'
+                    ? 'bg-red-600 text-white animate-pulse'
+                    : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
+                }`}
+              >
+                <Mic size={15} />
+                <span className="hidden sm:inline">{isListening && activeVoiceField === 'radiation' ? 'Listening' : 'Speak'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: Severity Slider */}
+        {currentStep === 4 && !isAyush && (
+          <div className="animate-slide-up text-center space-y-6">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
+                {isHindi ? 'कदम 5: तीव्रता' : 'Step 5: Severity Scale'}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                {isHindi ? 'तकलीफ की तीव्रता कितनी है?' : 'How severe is your discomfort?'}
+              </h2>
+            </div>
+
+            <div className="max-w-md mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-200/90 shadow-xs space-y-6">
+              <div className="flex flex-col items-center">
+                <span className="text-5xl font-black text-slate-900">{severity}/10</span>
+                <span
+                  className={`text-xs font-semibold px-3 py-1 rounded-md mt-2 ${
+                    severity >= 8
+                      ? 'bg-red-50 text-red-700 border border-red-200'
+                      : severity >= 5
+                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                  }`}
+                >
+                  {severity >= 8
+                    ? isHindi ? 'अत्यधिक तीव्र (Severe / High)' : 'Severe Discomfort'
+                    : severity >= 5
+                    ? isHindi ? 'मध्यम (Moderate)' : 'Moderate'
+                    : isHindi ? 'हल्का (Mild)' : 'Mild'}
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min={1}
+                max={10}
+                value={severity}
+                onChange={(e) => setSeverity(Number(e.target.value))}
+                className="w-full h-3.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
+              />
+
+              <div className="flex justify-between text-xs font-bold text-slate-400">
+                <span>1 (Mild)</span>
+                <span>5 (Moderate)</span>
+                <span>10 (Unbearable)</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 5: Associated Symptoms */}
+        {currentStep === 5 && !isAyush && (
+          <div className="animate-slide-up space-y-6">
+            <div className="text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
+                {isHindi ? 'कदम 6: अन्य लक्षण' : 'Step 6: Associated Symptoms'}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                {isHindi ? 'क्या साथ में कोई अन्य लक्षण भी हैं?' : 'Are you experiencing other symptoms?'}
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                {isHindi ? 'लागू होने वाले लक्षण चुनें, या नीचे खुद बोलें।' : 'Select all that apply, or speak your symptoms below.'}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+              {currentOptions.associated.map((opt) => {
+                const isChecked = associated.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      if (isChecked) {
+                        setAssociated(associated.filter((x) => x !== opt.id));
+                      } else {
+                        setAssociated([...associated, opt.id]);
+                      }
+                    }}
+                    className={`p-4 rounded-2xl border-2 text-sm sm:text-base font-bold flex items-center justify-between transition-all ${
+                      isChecked
+                        ? 'bg-teal-50 border-teal-600 text-teal-800 shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-teal-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>{isHindi ? opt.labelHi : opt.labelEn}</span>
+                    {isChecked && <CheckCircle2 size={18} className="text-teal-600 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom Associated Symptom Input/Voice */}
+            <div className="max-w-lg mx-auto p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-2">
+              <input
+                type="text"
+                value={customAssociated}
+                onChange={(e) => setCustomAssociated(e.target.value)}
+                placeholder={isHindi ? 'या कोई अन्य लक्षण बोलें या टाइप करें...' : 'Or speak/type any other symptom...'}
+                className="flex-1 bg-transparent text-xs sm:text-sm font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => toggleVoice('associated', setCustomAssociated)}
+                className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
+                  isListening && activeVoiceField === 'associated'
+                    ? 'bg-red-600 text-white animate-pulse'
+                    : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
+                }`}
+              >
+                <Mic size={15} />
+                <span className="hidden sm:inline">{isListening && activeVoiceField === 'associated' ? 'Listening' : 'Speak'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 6: Aggravating Factors */}
+        {currentStep === 6 && !isAyush && (
+          <div className="animate-slide-up space-y-6">
+            <div className="text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
+                {isHindi ? 'कदम 7: बढ़ने के कारण' : 'Step 7: Aggravating Factors'}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                {isHindi ? 'तकलीफ किस चीज से बढ़ती है?' : 'What makes your symptoms worse?'}
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+              {currentOptions.aggravating.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => pickAndAdvance(setAggravating, isHindi ? opt.labelHi : opt.labelEn)}
+                  className={`p-4 rounded-2xl border-2 text-sm sm:text-base font-bold transition-all text-center ${
+                    aggravating === (isHindi ? opt.labelHi : opt.labelEn)
+                      ? 'bg-teal-50 border-teal-600 text-teal-800 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-teal-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {isHindi ? opt.labelHi : opt.labelEn}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Input / Speech */}
+            <div className="max-w-lg mx-auto p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-2">
+              <input
+                type="text"
+                value={aggravating}
+                onChange={(e) => setAggravating(e.target.value)}
+                placeholder={isHindi ? 'या बोलें/लिखें कि किससे तकलीफ बढ़ती है...' : 'Or type / speak what triggers or worsens it...'}
+                className="flex-1 bg-transparent text-xs sm:text-sm font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => toggleVoice('aggravating', setAggravating)}
+                className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
+                  isListening && activeVoiceField === 'aggravating'
+                    ? 'bg-red-600 text-white animate-pulse'
+                    : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
+                }`}
+              >
+                <Mic size={15} />
+                <span className="hidden sm:inline">{isListening && activeVoiceField === 'aggravating' ? 'Listening' : 'Speak'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 7: Relieving Factors */}
+        {currentStep === 7 && !isAyush && (
+          <div className="animate-slide-up space-y-6">
+            <div className="text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
+                {isHindi ? 'कदम 8: राहत के उपाय' : 'Step 8: Relieving Factors'}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                {isHindi ? 'किस चीज से आराम मिलता है?' : 'What provides relief?'}
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+              {currentOptions.relieving.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => pickAndAdvance(setRelieving, isHindi ? opt.labelHi : opt.labelEn)}
+                  className={`p-4 rounded-2xl border-2 text-sm sm:text-base font-bold transition-all text-center ${
+                    relieving === (isHindi ? opt.labelHi : opt.labelEn)
+                      ? 'bg-teal-50 border-teal-600 text-teal-800 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-teal-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {isHindi ? opt.labelHi : opt.labelEn}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Input / Speech */}
+            <div className="max-w-lg mx-auto p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-2">
+              <input
+                type="text"
+                value={relieving}
+                onChange={(e) => setRelieving(e.target.value)}
+                placeholder={isHindi ? 'या बोलें/लिखें कि किससे आराम मिलता है...' : 'Or type / speak what brings relief...'}
+                className="flex-1 bg-transparent text-xs sm:text-sm font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => toggleVoice('relieving', setRelieving)}
+                className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
+                  isListening && activeVoiceField === 'relieving'
+                    ? 'bg-red-600 text-white animate-pulse'
+                    : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
+                }`}
+              >
+                <Mic size={15} />
+                <span className="hidden sm:inline">{isListening && activeVoiceField === 'relieving' ? 'Listening' : 'Speak'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 1 (AYUSH): Dynamic Pariksha Question Tree */}
+        {currentStep === 1 && isAyush && (
+          <div className="animate-slide-up space-y-6">
+            {!ayushCompleted ? (
+              <div className="bg-emerald-50/50 rounded-xl p-6 sm:p-7 border border-emerald-200/90 shadow-xs">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                    <Leaf size={15} /> {isHindi ? 'दोष परीक्षण' : 'Dosha Root Cause Analysis'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      speakPrompt(
+                        isHindi
+                          ? AYURVEDA_QUESTION_TREE[activeAyushQuestionId]?.questionHi
+                          : AYURVEDA_QUESTION_TREE[activeAyushQuestionId]?.questionEn,
+                        currentPatient.language
+                      )
+                    }
+                    className="p-1.5 text-emerald-700 bg-white hover:bg-emerald-100 rounded-lg border border-emerald-200/60"
+                  >
+                    <Volume2 size={15} />
+                  </button>
+                </div>
+
+                <h2 className="text-xl sm:text-2xl font-black text-emerald-950 mb-6">
+                  {isHindi
+                    ? AYURVEDA_QUESTION_TREE[activeAyushQuestionId]?.questionHi
+                    : AYURVEDA_QUESTION_TREE[activeAyushQuestionId]?.questionEn}
+                </h2>
+
+                <div className="space-y-2.5">
+                  {AYURVEDA_QUESTION_TREE[activeAyushQuestionId]?.options.map((opt, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        const newResponses = [
+                          ...ayushResponses,
+                          {
+                            qId: activeAyushQuestionId,
+                            answer: isHindi ? opt.labelHi : opt.labelEn,
+                            dosha: opt.associatedDosha,
+                          },
+                        ];
+                        setAyushResponses(newResponses);
+
+                        if (opt.clinicalNote?.includes('Agni')) setAgni(opt.clinicalNote);
+                        if (activeAyushQuestionId === 'q_gastro_vata') setKoshtha('Krura (Constipation)');
+                        if (activeAyushQuestionId === 'q_general_sleep') setNidra(isHindi ? opt.labelHi : opt.labelEn);
+
+                        if (opt.nextQuestionId) {
+                          setActiveAyushQuestionId(opt.nextQuestionId);
+                        } else {
+                          const doshaCounts = newResponses.reduce((acc, r) => {
+                            if (r.dosha && r.dosha !== 'none') acc[r.dosha] = (acc[r.dosha] || 0) + 1;
+                            return acc;
+                          }, {} as Record<string, number>);
+
+                          let dominantDosha = 'Vata-Pitta';
+                          if (Object.keys(doshaCounts).length > 0) {
+                            const sorted = Object.entries(doshaCounts).sort((a, b) => b[1] - a[1]);
+                            dominantDosha = sorted.map((s) => s[0].charAt(0).toUpperCase() + s[0].slice(1)).join('-');
+                          }
+                          setPrakriti(dominantDosha);
+                          setAyushCompleted(true);
+                          advance();
+                        }
+                      }}
+                      className="w-full p-3.5 rounded-lg border border-slate-200 bg-white text-left text-sm font-semibold text-slate-800 hover:border-emerald-500 hover:bg-emerald-50/60 transition-all shadow-2xs"
+                    >
+                      {isHindi ? opt.labelHi : opt.labelEn}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-emerald-50/60 rounded-xl p-6 border border-emerald-200/90 text-center space-y-4 animate-fade-in shadow-xs">
+                <CheckCircle2 size={36} className="text-emerald-600 mx-auto" />
+                <h3 className="text-xl font-black text-emerald-950">
+                  {isHindi ? 'आयुर्वेदिक परीक्षण पूर्ण' : 'Ayurvedic Assessment Complete'}
+                </h3>
+                <p className="text-sm font-semibold text-emerald-800">
+                  {isHindi ? `दोष प्रधानता: ${prakriti}` : `Predominant Dosha: ${prakriti}`}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => advance()}
+                  className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-medium text-xs shadow-xs transition-colors"
+                >
+                  {isHindi ? 'आगे बढ़ें' : 'Continue to Lifestyle'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* STEP 2 (AYUSH): Ahara & Vihara */}
+        {currentStep === 2 && isAyush && (
+          <div className="animate-slide-up text-center space-y-6">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 block mb-1">
+                {isHindi ? 'आहार-विहार' : 'Diet & Daily Habits'}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                {isHindi ? 'आपकी खान-पान और दिनचर्या कैसी है?' : 'Describe your diet and daily lifestyle'}
+              </h2>
+            </div>
+
+            <div className="max-w-md mx-auto space-y-3">
+              {[
+                { labelEn: 'Spicy, irregular meals with heavy tea', labelHi: 'तीखा, अनियमित भोजन और अधिक चाय' },
+                { labelEn: 'Heavy oily food, late night dinners', labelHi: 'भारी तला-भुना खाना और देर रात भोजन' },
+                { labelEn: 'Light vegetarian diet, timely meals', labelHi: 'सादा शाकाहारी भोजन, समय पर' },
+                { labelEn: 'Sedentary desk work, high stress', labelHi: 'बैठकर काम, मानसिक तनाव अधिक' },
+              ].map((opt, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => pickAndAdvance(setAharaVihara, isHindi ? opt.labelHi : opt.labelEn)}
+                  className={`w-full p-4 rounded-2xl border-2 text-sm font-bold transition-all text-left ${
+                    aharaVihara === (isHindi ? opt.labelHi : opt.labelEn)
+                      ? 'bg-emerald-50 border-emerald-600 text-emerald-900 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300'
+                  }`}
+                >
+                  {isHindi ? opt.labelHi : opt.labelEn}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3 (AYUSH): Nidra */}
+        {currentStep === 3 && isAyush && (
+          <div className="animate-slide-up text-center space-y-6">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 block mb-1">
+                {isHindi ? 'निद्रा' : 'Sleep Quality'}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                {isHindi ? 'आपकी नींद कैसी रहती है?' : 'How is your sleep quality?'}
+              </h2>
+            </div>
+
+            <div className="max-w-md mx-auto space-y-3">
+              {[
+                { labelEn: 'Disturbed / Insomnia (< 6 hrs, anxious)', labelHi: 'अल्प निद्रा (< 6 घंटे, बेचैनी)' },
+                { labelEn: 'Sound, deep peaceful sleep (7-8 hrs)', labelHi: 'गहरी और शांतिपूर्ण नींद (7-8 घंटे)' },
+                { labelEn: 'Excessive daytime sleepiness (Tandra)', labelHi: 'दिन में अत्यधिक नींद और आलस्य' },
+              ].map((opt, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => pickAndAdvance(setNidra, isHindi ? opt.labelHi : opt.labelEn)}
+                  className={`w-full p-4 rounded-2xl border-2 text-sm font-bold transition-all text-left ${
+                    nidra === (isHindi ? opt.labelHi : opt.labelEn)
+                      ? 'bg-emerald-50 border-emerald-600 text-emerald-900 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300'
+                  }`}
+                >
+                  {isHindi ? opt.labelHi : opt.labelEn}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4 (AYUSH): Final Prakriti Overview */}
+        {currentStep === 4 && isAyush && (
+          <div className="animate-slide-up text-center space-y-6 max-w-lg mx-auto">
+            <div className="p-6 bg-emerald-50/60 rounded-xl border border-emerald-200/90 space-y-4 shadow-xs">
+              <Sparkles size={36} className="text-emerald-600 mx-auto" />
+              <h2 className="text-xl sm:text-2xl font-black text-emerald-950">
+                {isHindi ? 'आयुर्वेदिक नैदानिक ​​सारांश' : 'Ayurvedic Assessment Ready'}
+              </h2>
+              <div className="text-xs font-semibold text-emerald-900 bg-white p-4 rounded-lg border border-emerald-200/80 space-y-2 text-left shadow-2xs">
+                <div><span className="text-slate-500 font-normal">Prakriti:</span> <span className="font-bold text-slate-900">{prakriti}</span></div>
+                <div><span className="text-slate-500 font-normal">Agni:</span> <span className="font-bold text-slate-900">{agni}</span></div>
+                <div><span className="text-slate-500 font-normal">Koshtha:</span> <span className="font-bold text-slate-900">{koshtha}</span></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* 3. Persistent Clean Navigation Bar */}
+      <div className="pt-5 border-t border-slate-100 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="px-4 py-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs flex items-center gap-1.5 transition-all shadow-2xs"
+        >
+          <ArrowLeft size={14} />
+          <span>{isHindi ? 'पीछे' : 'Back'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => advance()}
+          disabled={currentStep === 0 && !chiefComplaintText.trim()}
+          className={`px-5 py-2.5 rounded-lg font-medium text-xs sm:text-sm flex items-center gap-2 transition-all shadow-xs ${
+            currentStep === 0 && !chiefComplaintText.trim()
+              ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
+          }`}
+        >
+          <span>
+            {currentStep === totalSteps - 1
+              ? isHindi
+                ? 'ओपीडी कक्ष व टोकन प्राप्त करें'
+                : 'Confirm OPD & Get Token'
+              : isHindi
+              ? 'आगे बढ़ें'
+              : 'Continue'}
+          </span>
+          <ArrowRight size={15} />
+        </button>
+      </div>
+
+    </div>
+  );
+}
