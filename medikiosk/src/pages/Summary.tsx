@@ -83,7 +83,7 @@ export default function Summary() {
         </div>
 
         <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-          {isHindi ? 'पंजीकरण सफलतापूर्वक दर्ज' : 'Intake Triage Complete'}
+          {isHindi ? 'पंजीकरण सफलतापूर्वक संपन्न' : 'OPD Registration Complete'}
         </h1>
         <p className="text-xs text-slate-600 mt-2 max-w-md mx-auto leading-relaxed">
           {isHindi
@@ -91,37 +91,41 @@ export default function Summary() {
             : 'Your symptoms and clinical intake have been transferred to the attending physician. Please proceed to the station below.'}
         </p>
 
-        {/* Patient-Friendly ESI Triage Card (Feature 4D) */}
+        {/* Reassuring Care Route Card (Calm Patient Guidance) */}
         {currentPatient.esiTriage && (
           <div
             className={`mt-6 p-4 rounded-xl border text-left ${
               currentPatient.esiTriage.level <= 2
-                ? 'bg-red-50/80 border-red-200 text-red-950'
+                ? 'bg-blue-50/80 border-blue-200 text-blue-950'
                 : currentPatient.esiTriage.level === 3
-                ? 'bg-amber-50/80 border-amber-200 text-amber-950'
-                : 'bg-blue-50/80 border-blue-200 text-blue-950'
+                ? 'bg-amber-50/60 border-amber-200 text-amber-950'
+                : 'bg-slate-50 border-slate-200 text-slate-900'
             }`}
           >
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-white/80 border border-current">
-                {isHindi ? `प्राथमिकता स्तर: ESI-${currentPatient.esiTriage.level}` : `Triage Priority: ESI-${currentPatient.esiTriage.level}`}
-              </span>
-              <span className="text-[10px] font-bold">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/90 border border-current">
                 {currentPatient.esiTriage.level <= 2
-                  ? isHindi ? '🚨 तत्काल ध्यान अपेक्षित' : '🚨 Immediate Attention Required'
+                  ? isHindi ? 'शीघ्र सहायता' : 'Fast-Track Check-In'
                   : currentPatient.esiTriage.level === 3
-                  ? isHindi ? '⚠️ प्राथमिक परामर्श' : '⚠️ Priority Evaluation'
-                  : isHindi ? '✓ नियमित परामर्श' : '✓ Standard Care'}
+                  ? isHindi ? 'परामर्श क्रम' : 'Care Review'
+                  : isHindi ? 'सामान्य परामर्श' : 'Standard Care'}
+              </span>
+              <span className="text-[11px] font-bold">
+                {currentPatient.esiTriage.level <= 2
+                  ? isHindi ? 'प्राथमिकता सहायता निर्धारित' : 'Priority Care Route'
+                  : currentPatient.esiTriage.level === 3
+                  ? isHindi ? 'परामर्श विवरण प्रेषित' : 'Details Sent to Doctor'
+                  : isHindi ? 'पंजीकरण सफल' : 'Confirmed'}
               </span>
             </div>
             <p className="text-xs font-medium leading-relaxed">
               {currentPatient.esiTriage.level <= 2
                 ? isHindi
-                  ? 'आपके लक्षणों के आधार पर आपको तत्काल प्राथमिकता दी गई है। कृपया सीधे नर्सिंग काउंटर या आपातकालीन कक्ष में संपर्क करें।'
-                  : 'Based on your symptoms, your intake has been escalated to High Priority. Please inform the triage nurse immediately.'
+                  ? 'आपकी जानकारी ओपीडी टीम को प्राथमिकता के साथ भेज दी गई है। कृपया अपने टोकन के साथ सीधे नर्सिंग काउंटर पर संपर्क करें ताकि आपकी जांच शीघ्र शुरू हो सके।'
+                  : 'Your clinical details have been shared with our attending team. Please present your token at the nursing desk for fast-track assistance.'
                 : isHindi
-                ? 'आपकी जानकारी ओपीडी परामर्श कक्ष को प्रेषित कर दी गई है। कृपया निर्धारित कक्ष के बाहर प्रतीक्षा करें।'
-                : 'Your intake details have been transmitted to the OPD desk. Diagnostic resources have been pre-allocated.'}
+                ? 'आपके लक्षण ओपीडी चिकित्सक को भेज दिए गए हैं। कृपया अपने टोकन नंबर के बुलाए जाने तक निर्धारित प्रतीक्षा क्षेत्र में बैठें।'
+                : 'Your intake details have been transmitted to the OPD desk. Please take a seat in the waiting area until your token is called.'}
             </p>
           </div>
         )}

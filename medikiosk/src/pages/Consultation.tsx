@@ -112,26 +112,52 @@ export default function Consultation() {
     }
   }, [currentStep, isAyush, chiefComplaintText, ayushCompleted]);
 
-  // Load Gemini adaptive follow-up questions for Step 8 (Feature 4A)
+  // Background Pre-fetching for Step 8 follow-up questions to eliminate loading lag
   useEffect(() => {
-    if (currentStep === 8 && !isAyush && adaptiveQuestions.length === 0) {
+    if (!isAyush && chiefComplaintText && chiefComplaintText.trim().length > 2 && adaptiveQuestions.length === 0) {
       setLoadingAdaptive(true);
-      generateAdaptiveQuestions(
-        chiefComplaintText,
-        currentPatient.age || 'Adult',
-        currentPatient.gender || 'Unknown'
-      )
+      generateAdaptiveQuestions({
+        chiefComplaint: chiefComplaintText,
+        age: currentPatient.age || 'Adult',
+        gender: currentPatient.gender || 'Unknown',
+        duration,
+        site,
+        character,
+        radiation,
+        severity,
+        aggravating,
+        relieving,
+        associated,
+        chronicConditions: currentPatient.chronicConditions
+      })
         .then((questions) => {
-          setAdaptiveQuestions(questions);
+          if (questions && questions.length > 0) {
+            setAdaptiveQuestions(questions);
+          }
         })
         .catch((err) => {
-          console.warn('Failed to load adaptive questions:', err);
+          console.warn('Silent fallback for adaptive questions:', err);
         })
         .finally(() => {
           setLoadingAdaptive(false);
         });
     }
-  }, [currentStep, isAyush, chiefComplaintText, adaptiveQuestions.length, currentPatient.age, currentPatient.gender]);
+  }, [
+    isAyush,
+    chiefComplaintText,
+    adaptiveQuestions.length,
+    currentPatient.age,
+    currentPatient.gender,
+    duration,
+    site,
+    character,
+    radiation,
+    severity,
+    aggravating,
+    relieving,
+    associated,
+    currentPatient.chronicConditions
+  ]);
 
   // Read aloud prompt when step changes
   useEffect(() => {
@@ -203,8 +229,8 @@ export default function Consultation() {
         textToSpeak = isHindi ? 'किस चीज से आराम मिलता है?' : 'What provides relief?';
       } else if (currentStep === 8) {
         textToSpeak = isHindi
-          ? 'सटीक नैदानिक मूल्यांकन के लिए इन अनुकूली सवालों के जवाब दें।'
-          : 'Please answer these targeted adaptive questions formulated by Gemini AI.';
+          ? 'डॉक्टर के परामर्श के लिए कृपया इन कुछ संक्षिप्त सवालों के जवाब दें।'
+          : 'Please answer these quick follow-up questions to help your doctor.';
       }
     } else if (isAyush) {
       if (currentStep === 1 && !ayushCompleted) {
@@ -263,7 +289,7 @@ export default function Consultation() {
     }));
 
     if (option.isRedFlag) {
-      const flagText = `[AI Alert]: ${option.labelEn}`;
+      const flagText = `[Priority Marker]: ${option.labelEn}`;
       if (!detectedRedFlags.includes(flagText)) {
         setDetectedRedFlags((prev) => [...prev, flagText]);
       }
@@ -290,6 +316,7 @@ export default function Consultation() {
       relievingFactors: relieving,
       associatedSymptoms: finalAssociated,
       redFlags: detectedRedFlags,
+      adaptiveAnswers,
       prakriti,
       agni,
       koshtha,
@@ -938,21 +965,21 @@ export default function Consultation() {
           </div>
         )}
 
-        {/* STEP 8: AI Adaptive Clinical Follow-up (Feature 4A with Gemini 3.5 Flash-lite) */}
+        {/* STEP 8: Clinical Follow-up (Adaptive Questioning) */}
         {currentStep === 8 && !isAyush && (
           <div className="animate-slide-up space-y-6">
             <div className="text-center">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center justify-center gap-1.5 mb-1">
-                <Sparkles size={14} className="text-blue-600 animate-pulse" />
-                {isHindi ? 'कदम 9: एआई अनुकूली नैदानिक प्रश्न' : 'Step 9: AI Adaptive Clinical Follow-up'}
+                <Sparkles size={14} className="text-blue-600" />
+                {isHindi ? 'कदम 9: अतिरिक्त स्वास्थ्य विवरण' : 'Step 9: Additional Health Details'}
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                {isHindi ? 'सटीक निदान के लिए लक्षित प्रश्न' : 'Targeted Clinical Follow-up Questions'}
+                {isHindi ? 'परामर्श हेतु संक्षिप्त प्रश्न' : 'Targeted Health Questions'}
               </h2>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
                 {isHindi
-                  ? 'जेमिनी एआई ने आपके लक्षणों के आधार पर इन प्रश्नों को तैयार किया है।'
-                  : 'Formulated by Gemini 3.5 Clinical Intelligence to identify critical differential markers.'}
+                  ? 'डॉक्टर को आपकी स्थिति को और बेहतर समझने में मदद करने के लिए कुछ संक्षिप्त प्रश्न।'
+                  : 'A few short questions to help your doctor understand your condition better before your turn.'}
               </p>
             </div>
 
@@ -960,7 +987,7 @@ export default function Consultation() {
               <div className="p-8 bg-blue-50/50 rounded-2xl border border-blue-200/80 text-center space-y-3">
                 <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
                 <p className="text-xs font-bold text-blue-900">
-                  {isHindi ? 'जेमिनी एआई अनुकूली प्रश्न तैयार कर रहा है...' : 'Gemini AI is analyzing clinical presentation & generating questions...'}
+                  {isHindi ? 'आपके स्वास्थ्य विवरण के अनुसार प्रश्न तैयार किए जा रहे हैं...' : 'Preparing personalized follow-up questions...'}
                 </p>
               </div>
             ) : adaptiveQuestions.length > 0 ? (
@@ -972,14 +999,9 @@ export default function Consultation() {
                         {qIdx + 1}. {isHindi ? q.questionHi : q.questionEn}
                       </h3>
                       <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0">
-                        Gemini 3.5
+                        {isHindi ? 'स्वास्थ्य प्रश्न' : 'Care Review'}
                       </span>
                     </div>
-                    {q.clinicalRationale && (
-                      <p className="text-[11px] text-slate-500 italic bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        {q.clinicalRationale}
-                      </p>
-                    )}
                     <div className="space-y-1.5">
                       {q.options.map((opt) => {
                         const isSelected = adaptiveAnswers[q.id] === (isHindi ? opt.labelHi : opt.labelEn);
@@ -994,15 +1016,8 @@ export default function Consultation() {
                                 : 'bg-white border-slate-200 hover:border-slate-300 text-slate-800'
                             }`}
                           >
-                            <div className="flex items-center gap-2">
-                              {opt.isRedFlag && (
-                                <span className="text-[10px] font-black text-red-700 bg-red-100 px-1.5 py-0.5 rounded uppercase">
-                                  Warning
-                                </span>
-                              )}
-                              <span>{isHindi ? opt.labelHi : opt.labelEn}</span>
-                            </div>
-                            {isSelected && <CheckCircle2 size={16} className="text-blue-600 shrink-0" />}
+                            <span className="leading-relaxed">{isHindi ? opt.labelHi : opt.labelEn}</span>
+                            {isSelected && <CheckCircle2 size={16} className="text-blue-600 shrink-0 ml-2" />}
                           </button>
                         );
                       })}
@@ -1012,7 +1027,7 @@ export default function Consultation() {
               </div>
             ) : (
               <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-center text-xs text-slate-600">
-                {isHindi ? 'कोई अतिरिक्त प्रश्न नहीं। आगे बढ़ें।' : 'Standard protocol completed. Click Continue to finalize triage.'}
+                {isHindi ? 'सभी प्रश्न पूरे हुए। कृपया आगे बढ़ें।' : 'Standard questions completed. Click Continue to proceed.'}
               </div>
             )}
           </div>
@@ -1229,7 +1244,7 @@ export default function Consultation() {
           {isCalculatingEsi ? (
             <div className="flex items-center gap-2">
               <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span>{isHindi ? 'गणना जारी है...' : 'Calculating ESI...'}</span>
+              <span>{isHindi ? 'पंजीकरण पूरा हो रहा है...' : 'Finalizing Registration...'}</span>
             </div>
           ) : (
             <>
@@ -1248,18 +1263,18 @@ export default function Consultation() {
         </button>
       </div>
 
-      {/* Feature 4D: Calculating ESI Triage Modal */}
+      {/* Finalizing Registration Modal */}
       {isCalculatingEsi && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl max-w-sm w-full text-center space-y-3">
             <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
             <h3 className="font-bold text-slate-900 text-sm">
-              {isHindi ? 'आपातकालीन तीव्रता (ESI) विश्लेषण' : 'Evaluating ESI Triage Engine'}
+              {isHindi ? 'पंजीकरण पूरा किया जा रहा है' : 'Finalizing Your OPD Registration'}
             </h3>
             <p className="text-xs text-slate-500">
               {isHindi
-                ? 'लक्षणों और महत्वपूर्ण संकेतों का जेमिनी 3.5 एआई द्वारा विश्लेषण किया जा रहा है...'
-                : 'Scoring acuity, vital parameters & red flags via Gemini 3.5 Flash-lite...'}
+                ? 'आपकी जानकारी सुरक्षित रूप से ओपीडी डॉक्टर को भेजी जा रही है...'
+                : 'Securely transferring your details to the attending OPD physician...'}
             </p>
           </div>
         </div>

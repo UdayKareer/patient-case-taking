@@ -361,11 +361,15 @@ Return ONLY a valid JSON object strictly matching this schema with no markdown o
   "predictedResources": ["List of medical resources needed: e.g. 12-Lead ECG, Lab Panel, Chest X-ray, IV Access"]
 }`;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4500);
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
@@ -375,6 +379,7 @@ Return ONLY a valid JSON object strictly matching this schema with no markdown o
         })
       }
     );
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.warn('Gemini API call returned non-200, falling back to rule engine:', response.status);
@@ -407,121 +412,147 @@ Return ONLY a valid JSON object strictly matching this schema with no markdown o
   }
 }
 
+export interface PatientAdaptiveContext {
+  chiefComplaint: string;
+  age?: string;
+  gender?: string;
+  duration?: string;
+  site?: string;
+  character?: string;
+  radiation?: string;
+  severity?: number;
+  aggravating?: string;
+  relieving?: string;
+  associated?: string[];
+  chronicConditions?: Array<{ condition: string }>;
+}
+
 /**
  * Generate 2-3 adaptive clinical follow-up questions using Gemini 3.5 Flash-lite (Feature 4A)
+ * Enhanced with context-rich prompting, empathetic patient phrasing, and deterministic fail-safe.
  */
 export async function generateAdaptiveQuestions(
-  chiefComplaint: string,
-  age: string,
-  gender: string
+  contextOrComplaint: string | PatientAdaptiveContext,
+  fallbackAge?: string,
+  fallbackGender?: string
 ): Promise<DynamicQuestion[]> {
+  const context: PatientAdaptiveContext =
+    typeof contextOrComplaint === 'string'
+      ? {
+          chiefComplaint: contextOrComplaint,
+          age: fallbackAge || 'Adult',
+          gender: fallbackGender || 'Unknown'
+        }
+      : contextOrComplaint;
+
+  const chiefComplaint = context.chiefComplaint || '';
   const domain = detectClinicalDomain(chiefComplaint);
 
-  // Default deterministic clinical trees if API fails or offline
+  // Default deterministic clinical trees with calm, empathetic, jargon-free phrasing
   const fallbackQuestions: Record<ClinicalDomain, DynamicQuestion[]> = {
     respiratory: [
       {
         id: 'resp_sputum',
-        questionEn: 'What is the nature of your cough and sputum (phlegm)?',
+        questionEn: 'What is the nature of your cough and secretions?',
         questionHi: 'आपकी खांसी और बलगम का स्वरूप कैसा है?',
-        clinicalRationale: 'Distinguishes viral bronchitis vs bacterial lower respiratory infection vs hemoptysis red flag.',
+        clinicalRationale: 'Assesses infectious vs inflammatory etiology and bronchial involvement.',
         options: [
-          { id: 'dry_hacking', labelEn: 'Dry, irritating hacking cough with no phlegm', labelHi: 'सूखी खांसी, बिना बलगम के' },
-          { id: 'yellow_green', labelEn: 'Productive with thick yellowish/greenish phlegm', labelHi: 'गाढ़ा पीला या हरा बलगम आना' },
-          { id: 'blood_tinged', labelEn: 'Red / Blood-tinged streaks in sputum (Hemoptysis)', labelHi: 'बलगम में खून के छींटे या लाल रंग', isRedFlag: true },
-          { id: 'clear_mucoid', labelEn: 'Thin clear / whitish watery secretions', labelHi: 'सफेद या पतला बलगम' }
+          { id: 'dry_hacking', labelEn: 'Dry, irritating cough without phlegm', labelHi: 'सूखी खांसी, बिना बलगम के' },
+          { id: 'yellow_green', labelEn: 'Thick yellowish or greenish phlegm', labelHi: 'गाढ़ा पीला या हरा बलगम' },
+          { id: 'blood_tinged', labelEn: 'Small pink or red streaks noticed in phlegm', labelHi: 'बलगम में हल्के लाल या गुलाबी छींटे', isRedFlag: true },
+          { id: 'clear_mucoid', labelEn: 'Clear or watery thin secretions', labelHi: 'सफेद या पतला बलगम' }
         ]
       },
       {
         id: 'resp_triggers',
-        questionEn: 'Are there any specific triggers that worsen your breathing?',
-        questionHi: 'क्या किसी खास चीज से सांस लेने में तकलीफ बढ़ जाती है?',
-        clinicalRationale: 'Identifies atopic asthma exacerbation vs environmental irritant exposure.',
+        questionEn: 'Do specific situations make breathing more difficult?',
+        questionHi: 'क्या किसी विशेष स्थिति में सांस लेने में अधिक कठिनाई होती है?',
+        clinicalRationale: 'Identifies postural or environmental respiratory patterns.',
         options: [
-          { id: 'cold_dust', labelEn: 'Cold night air, dust, pollution, or smoke', labelHi: 'ठंडी हवा, धूल, धुआं या प्रदूषण' },
+          { id: 'cold_dust', labelEn: 'Exposure to cold air, dust, or smoke', labelHi: 'ठंडी हवा, धूल या धुआं' },
           { id: 'exertion_stairs', labelEn: 'Climbing stairs or walking briskly', labelHi: 'सीढ़ियां चढ़ने या तेज चलने पर' },
-          { id: 'lying_flat', labelEn: 'Lying flat on bed at night (Orthopnea)', labelHi: 'सीधा लेटने पर सांस फूलना', isRedFlag: true },
-          { id: 'constant_all_times', labelEn: 'Continuous distress with no clear trigger', labelHi: 'लगातार तकलीफ बनी रहना' }
+          { id: 'lying_flat', labelEn: 'Lying flat on bed at night', labelHi: 'रात में बिस्तर पर सीधा लेटने पर', isRedFlag: true },
+          { id: 'constant_all_times', labelEn: 'Present consistently throughout the day', labelHi: 'दिनभर एक जैसी स्थिति रहना' }
         ]
       }
     ],
     gastrointestinal: [
       {
         id: 'gi_stool_nature',
-        questionEn: 'How would you describe your bowel movements over the last 24 hours?',
+        questionEn: 'How would you describe your bowel movements over the past 24 hours?',
         questionHi: 'पिछले 24 घंटों में आपके शौच (मल) की स्थिति कैसी रही है?',
-        clinicalRationale: 'Assesses Bristol Stool Scale, dehydration risk, and dysenteric markers.',
+        clinicalRationale: 'Screens for acute fluid loss and bowel inflammation.',
         options: [
-          { id: 'watery_frequent', labelEn: 'Frequent watery liquid motions (> 4-5 times)', labelHi: 'बार-बार पतले पानी जैसे दस्त (4-5 बार से अधिक)', isRedFlag: true },
-          { id: 'hard_straining', labelEn: 'Hard, pellet-like dry stools with severe straining', labelHi: 'सख्त सूखा मल और शौच में बहुत जोर लगाना' },
-          { id: 'blood_mucus', labelEn: 'Passage of red blood or dark black tarry stools', labelHi: 'शौच में खून या काला मल आना', isRedFlag: true },
-          { id: 'bloated_irregular', labelEn: 'Irregular bowel habits with excessive gas & cramps', labelHi: 'अनियमित शौच, पेट में मरोड़ और गैस' }
+          { id: 'watery_frequent', labelEn: 'Frequent watery loose motions (> 4 times today)', labelHi: 'बार-बार पतले पानी जैसे दस्त (आज 4 बार से अधिक)', isRedFlag: true },
+          { id: 'hard_straining', labelEn: 'Hard dry stool requiring significant effort', labelHi: 'सख्त सूखा मल और शौच में अधिक जोर लगना' },
+          { id: 'blood_mucus', labelEn: 'Noticed reddish or unusually dark black stools', labelHi: 'शौच में लाल या असामान्य काला रंग दिखना', isRedFlag: true },
+          { id: 'bloated_irregular', labelEn: 'Mild abdominal fullness with cramps and gas', labelHi: 'पेट में हल्का भारीपन, गैस और मरोड़' }
         ]
       },
       {
         id: 'gi_oral_intake',
-        questionEn: 'Are you able to keep fluids and food down without vomiting?',
-        questionHi: 'क्या आप पानी या खाना बिना उल्टी किए पचा पा रहे हैं?',
-        clinicalRationale: 'Evaluates acute dehydration severity and need for IV access.',
+        questionEn: 'Are you currently able to keep water and light food down?',
+        questionHi: 'क्या आप पानी और हल्का खाना बिना उल्टी के ले पा रहे हैं?',
+        clinicalRationale: 'Assesses oral tolerance and hydration capacity.',
         options: [
-          { id: 'tolerating_well', labelEn: 'Able to drink water and eat light meals normally', labelHi: 'पानी और हल्का भोजन आराम से ले पा रहे हैं' },
-          { id: 'vomiting_everything', labelEn: 'Unable to keep any water down, vomiting repeatedly', labelHi: 'पानी पीते ही तुरंत उल्टी हो जाना', isRedFlag: true },
-          { id: 'intense_thirst', labelEn: 'Extreme dry mouth, severe thirst and sunken eyes', labelHi: 'गला सूखना, अत्यधिक प्यास और कमजोरी', isRedFlag: true }
+          { id: 'tolerating_well', labelEn: 'Able to drink water and light liquids comfortably', labelHi: 'पानी और हल्का भोजन आराम से ले पा रहे हैं' },
+          { id: 'vomiting_everything', labelEn: 'Unable to keep liquids down, frequent vomiting', labelHi: 'पानी पीते ही उल्टी हो जाना', isRedFlag: true },
+          { id: 'intense_thirst', labelEn: 'Feeling severe thirst, dry lips, and marked weakness', labelHi: 'गला सूखना, तेज प्यास और कमजोरी लगना', isRedFlag: true }
         ]
       }
     ],
     fever: [
       {
         id: 'fever_chills_pattern',
-        questionEn: 'Does the fever come with teeth-chattering shivering chills or rigors?',
-        questionHi: 'क्या बुखार दांत किटकिटाने वाली कंपकंपी और ठंड के साथ आता है?',
-        clinicalRationale: 'Differentiates systemic bacteremia, malaria, or urinary tract pyelonephritis.',
+        questionEn: 'Does the fever come with shivering chills or sudden temperature peaks?',
+        questionHi: 'क्या बुखार ठंड लगने, कंपकंपी या तेज गर्माहट के साथ आता है?',
+        clinicalRationale: 'Evaluates febrile pattern and shivering rigors.',
         options: [
-          { id: 'severe_rigors', labelEn: 'Intense shivering chills requiring multiple blankets', labelHi: 'तेज कंपकंपी जिसमें कंबल ओढ़ने की जरूरत पड़े', isRedFlag: true },
-          { id: 'evening_sweats', labelEn: 'Rises every evening accompanied by night sweats', labelHi: 'हर शाम तेज होना और रात में पसीना आना' },
-          { id: 'continuous_high', labelEn: 'Continuous sustained heat (102°F+) without dropping', labelHi: 'लगातार 102°F से अधिक तेज बुखार' },
-          { id: 'low_grade_flu', labelEn: 'Mild dull temperature with generalized body aches', labelHi: 'हल्का बुखार और बदन में दर्द' }
+          { id: 'severe_rigors', labelEn: 'Shivering chills requiring extra warmth and blankets', labelHi: 'तेज कंपकंपी जिसमें कंबल ओढ़ने की जरूरत पड़े', isRedFlag: true },
+          { id: 'evening_sweats', labelEn: 'Tends to rise in the evening with sweating', labelHi: 'शाम के समय बढ़ना और पसीना आना' },
+          { id: 'continuous_high', labelEn: 'Persistent high body heat that does not settle', labelHi: 'लगातार तेज बुखार जो कम नहीं हो रहा' },
+          { id: 'low_grade_flu', labelEn: 'Mild feverish feeling with general body tiredness', labelHi: 'हल्का बुखार और शरीर में सुस्ती व दर्द' }
         ]
       }
     ],
     metabolic: [
       {
         id: 'metabolic_symptoms',
-        questionEn: 'Have you noticed any changes in thirst, urination frequency, or weight?',
-        questionHi: 'क्या अत्यधिक प्यास, बार-बार पेशाब या वजन में कमी महसूस हुई है?',
-        clinicalRationale: 'Screens for osmotic symptoms of glycemic decompensation or DKA.',
+        questionEn: 'Have you noticed any changes in thirst, urination, or energy levels?',
+        questionHi: 'क्या प्यास, पेशाब या ऊर्जा के स्तर में कोई बदलाव महसूस हुआ है?',
+        clinicalRationale: 'Screens for metabolic fluid homeostasis and glycemic balance.',
         options: [
-          { id: 'polyuria_thirst', labelEn: 'Excessive thirst and waking up repeatedly to urinate at night', labelHi: 'बहुत प्यास लगना और रात में बार-बार पेशाब आना' },
-          { id: 'unintentional_weight_loss', labelEn: 'Significant unexplained weight loss over recent weeks', labelHi: 'बिना कारण तेजी से वजन घटना', isRedFlag: true },
-          { id: 'blurred_vision', labelEn: 'Episodes of blurred vision or extreme midday drowsiness', labelHi: 'आंखों के आगे धुंधलापन या बहुत ज्यादा सुस्ती' },
-          { id: 'stable_routine', labelEn: 'No major changes, presenting for routine glycemic check', labelHi: 'कोई खास बदलाव नहीं, नियमित जांच के लिए आए हैं' }
+          { id: 'polyuria_thirst', labelEn: 'Waking frequently at night to drink water and urinate', labelHi: 'रात में बार-बार उठकर पानी पीना और पेशाब जाना' },
+          { id: 'unintentional_weight_loss', labelEn: 'Noticeable unintended weight reduction recently', labelHi: 'हाल में तेजी से वजन कम होना', isRedFlag: true },
+          { id: 'blurred_vision', labelEn: 'Episodes of visual blurriness or noticeable fatigue', labelHi: 'आंखों के आगे धुंधलापन या जल्दी थकान होना' },
+          { id: 'stable_routine', labelEn: 'No major changes, here for routine health follow-up', labelHi: 'कोई खास बदलाव नहीं, नियमित जांच के लिए आए हैं' }
         ]
       }
     ],
     pain: [
       {
         id: 'pain_radiation_check',
-        questionEn: 'Does the pain spread or shoot to any other area of your body?',
-        questionHi: 'क्या यह दर्द शरीर के किसी अन्य हिस्से में भी फैलता या खिंचता है?',
-        clinicalRationale: 'Evaluates dermatomal radiculopathy or visceral referred pain patterns.',
+        questionEn: 'Does the discomfort spread or travel to any other part of your body?',
+        questionHi: 'क्या यह परेशानी शरीर के किसी अन्य हिस्से में भी फैलती है?',
+        clinicalRationale: 'Evaluates dermatomal radiculopathy and referred pain patterns.',
         options: [
-          { id: 'rad_left_jaw', labelEn: 'Radiates into left shoulder, inner arm, or jaw', labelHi: 'बाएं कंधे, हाथ या जबड़े में फैलता है', isRedFlag: true },
-          { id: 'rad_back_scapula', labelEn: 'Pierces through directly to the mid-back or shoulder blade', labelHi: 'सीधे पीठ के पीछे की तरफ चुभता है' },
-          { id: 'rad_leg_sciatica', labelEn: 'Shoots down the back of the leg to calf and foot', labelHi: 'कमर से पैर और पिंडलियों तक खिंचता है' },
-          { id: 'rad_localized_none', labelEn: 'Stays strictly localized in one focal spot', labelHi: 'एक ही जगह रहता है, कहीं फैलता नहीं' }
+          { id: 'rad_left_jaw', labelEn: 'Spreads to shoulder, inner arm, or jaw', labelHi: 'कंधे, हाथ या जबड़े तक फैलता है', isRedFlag: true },
+          { id: 'rad_back_scapula', labelEn: 'Extends through to the upper back or shoulder blade', labelHi: 'पीठ के पीछे या कंधे की हड्डी तक जाता है' },
+          { id: 'rad_leg_sciatica', labelEn: 'Travels down through the hip, leg, or foot', labelHi: 'कमर से नीचे पैर या पंजे की तरफ जाता है' },
+          { id: 'rad_localized_none', labelEn: 'Remains strictly in one focal spot', labelHi: 'एक ही जगह रहता है, कहीं फैलता नहीं' }
         ]
       }
     ],
     general: [
       {
         id: 'general_functional_impact',
-        questionEn: 'How significantly is this health issue affecting your daily routine?',
+        questionEn: 'How is this condition affecting your ability to carry out daily activities?',
         questionHi: 'यह परेशानी आपकी दिनचर्या को कितना प्रभावित कर रही है?',
-        clinicalRationale: 'Assesses functional status and ambulatory safety.',
+        clinicalRationale: 'Assesses functional independence and ambulatory safety.',
         options: [
-          { id: 'bedridden', labelEn: 'Completely bedridden, unable to stand or walk unassisted', labelHi: 'बिस्तर से उठने या चलने में असमर्थ', isRedFlag: true },
-          { id: 'moderate_limit', labelEn: 'Able to do routine tasks but with significant difficulty', labelHi: 'दिक्कत के साथ रोजमर्रा के काम कर पा रहे हैं' },
-          { id: 'mild_annoyance', labelEn: 'Mild discomfort, able to work and move normally', labelHi: 'हल्की परेशानी, काम सामान्य रूप से चल रहा है' }
+          { id: 'bedridden', labelEn: 'Feeling very weak, needing assistance to stand or walk', labelHi: 'बहुत कमजोरी, उठने या चलने में सहारे की जरूरत', isRedFlag: true },
+          { id: 'moderate_limit', labelEn: 'Able to do light tasks but with noticeable difficulty', labelHi: 'कठिनाई के साथ हल्के काम कर पा रहे हैं' },
+          { id: 'mild_annoyance', labelEn: 'Mild discomfort, able to continue daily routine', labelHi: 'हल्की परेशानी, दैनिक काम सामान्य रूप से जारी हैं' }
         ]
       }
     ]
@@ -534,37 +565,50 @@ export async function generateAdaptiveQuestions(
   }
 
   try {
-    const prompt = `You are an expert clinical triage physician.
-A patient has presented with this chief complaint: "${chiefComplaint}".
-Patient Demographics: Age: ${age || 'Adult'}, Gender: ${gender || 'Unknown'}.
-Clinical Domain: ${domain}.
+    const prompt = `You are an empathetic, world-class hospital clinical consultant creating 2 follow-up questions for a patient intake kiosk.
+Patient Context:
+- Chief Complaint: "${chiefComplaint}"
+- Age: ${context.age || 'Adult'}, Gender: ${context.gender || 'Unknown'}
+- Duration: ${context.duration || 'Not specified'}
+- Location/Site: ${context.site || 'Not specified'}
+- Character: ${context.character || 'Not specified'}
+- Severity: ${context.severity || 'Unspecified'}/10
+- Associated Symptoms: ${(context.associated || []).join(', ') || 'None reported'}
 
-Generate 2 targeted, clinically high-yield follow-up questions to rule in or rule out critical differential diagnoses.
-Ensure each question has 3 to 4 realistic options in both English and Hindi, with 'isRedFlag: true' tagged for emergency warning answers.
+CRITICAL GUIDELINES FOR PATIENT SAFETY & PEACE OF MIND:
+1. Tone must be warm, reassuring, respectful, and clinically focused.
+2. DO NOT use fear-inducing terms (e.g. avoid words like 'fatal', 'heart attack danger', 'emergency red flag', 'critical warning', 'imminent threat').
+3. DO NOT use obscure medical jargon in patient options (e.g. use 'small red streaks in phlegm' instead of 'hemoptysis', use 'trouble breathing when lying flat' instead of 'orthopnea').
+4. Provide natural, accurate, conversational Hindi (in Devanagari script) alongside English for every question and option.
+5. Set 'isRedFlag: true' on options that indicate serious symptoms for internal hospital prioritization, but make the option label itself calm and descriptive.
 
 Return ONLY a valid JSON array matching this exact schema:
 [
   {
     "id": "q1",
-    "questionEn": "English question text",
+    "questionEn": "Patient-friendly English question text",
     "questionHi": "Hindi question text (in Devanagari script)",
-    "clinicalRationale": "Why this question is clinically essential",
+    "clinicalRationale": "Short physician rationale explaining what clinical condition this clarifies",
     "options": [
       {
         "id": "opt1",
-        "labelEn": "English option text",
-        "labelHi": "Hindi option text",
+        "labelEn": "Clear, reassuring English option",
+        "labelHi": "Hindi option translation",
         "isRedFlag": false
       }
     ]
   }
 ]`;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4500);
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
@@ -574,6 +618,7 @@ Return ONLY a valid JSON array matching this exact schema:
         })
       }
     );
+    clearTimeout(timeoutId);
 
     if (!response.ok) return domainFallbacks;
     const data = await response.json();
@@ -586,7 +631,7 @@ Return ONLY a valid JSON array matching this exact schema:
     }
     return domainFallbacks;
   } catch (err) {
-    console.warn('Error fetching Gemini adaptive questions, using clinical fallbacks:', err);
+    console.warn('Adaptive questions fetch timed out or errored, using clinical fallbacks smoothly:', err);
     return domainFallbacks;
   }
 }

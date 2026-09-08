@@ -1537,6 +1537,29 @@ export default function DoctorDashboard() {
                         ))}
                       </div>
                     )}
+
+                    {/* Targeted Intake Q&A / Follow-up Responses */}
+                    {selectedPatient.adaptiveAnswers && Object.keys(selectedPatient.adaptiveAnswers).length > 0 && (
+                      <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-200/80 space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-blue-900 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                            <Sparkles size={12} className="text-blue-600" />
+                            Clinical Intake Q&A (Follow-up Responses)
+                          </span>
+                          <span className="text-[10px] text-blue-700 font-semibold bg-white px-2 py-0.5 rounded border border-blue-100">
+                            Patient Verified
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {Object.entries(selectedPatient.adaptiveAnswers).map(([_qKey, ans], idx) => (
+                            <div key={idx} className="bg-white p-2.5 rounded-lg border border-blue-100/80 shadow-2xs">
+                              <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">Question Item {idx + 1}</span>
+                              <span className="font-bold text-slate-800 text-xs">{ans}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* O - OBJECTIVE */}

@@ -128,6 +128,7 @@ export interface PatientData {
   triageLevel: 'normal' | 'priority' | 'emergency';
   redFlags: string[];
   esiTriage?: EsiTriageResult;
+  adaptiveAnswers?: Record<string, string>;
 
   // Scanned Documents & OCR
   uploadedDocuments: UploadedDocument[];
@@ -246,6 +247,7 @@ const createInitialPatient = (): PatientData => ({
 
   triageLevel: 'normal',
   redFlags: [],
+  adaptiveAnswers: {},
 
   uploadedDocuments: [],
 
