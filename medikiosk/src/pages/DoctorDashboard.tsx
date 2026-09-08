@@ -67,7 +67,7 @@ export function getWaitMinutes(p: PatientData): number {
 }
 
 export function formatWaitTime(mins: number): string {
-  if (mins <= 1) return '1m wait';
+  if (mins < 1) return '< 1m wait';
   if (mins < 60) return `${mins}m wait`;
   const h = Math.floor(mins / 60);
   const m = mins % 60;
@@ -93,6 +93,15 @@ export default function DoctorDashboard() {
     initSocket();
     // Use queueTrigger to silence TS, it naturally triggers a re-render from Zustand
   }, [initSocket, queueTrigger]);
+
+  // Live real-time ticker: re-renders every 5 seconds so wait times increment live without page refresh
+  const [, setLiveTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLiveTick((prev) => prev + 1);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   const [activeChartTab, setActiveChartTab] = useState<'soap' | 'ocr' | 'ayush' | 'history'>('soap');
   const [doctorNotes, setDoctorNotes] = useState('');
