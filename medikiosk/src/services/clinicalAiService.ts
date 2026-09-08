@@ -577,10 +577,11 @@ Patient Context:
 
 CRITICAL GUIDELINES FOR PATIENT SAFETY & PEACE OF MIND:
 1. Tone must be warm, reassuring, respectful, and clinically focused.
-2. DO NOT use fear-inducing terms (e.g. avoid words like 'fatal', 'heart attack danger', 'emergency red flag', 'critical warning', 'imminent threat').
-3. DO NOT use obscure medical jargon in patient options (e.g. use 'small red streaks in phlegm' instead of 'hemoptysis', use 'trouble breathing when lying flat' instead of 'orthopnea').
-4. Provide natural, accurate, conversational Hindi (in Devanagari script) alongside English for every question and option.
-5. Set 'isRedFlag: true' on options that indicate serious symptoms for internal hospital prioritization, but make the option label itself calm and descriptive.
+2. AVOID REDUNDANT QUESTIONS: If the Patient Context above already specifies their Duration, Location/Site, Character, or Associated Symptoms, DO NOT ask them about those things again. Your questions MUST uncover entirely NEW information (e.g., triggers, progression, exact nature of the symptom).
+3. DO NOT use fear-inducing terms (e.g. avoid words like 'fatal', 'heart attack danger', 'emergency red flag', 'critical warning', 'imminent threat').
+4. DO NOT use obscure medical jargon in patient options (e.g. use 'small red streaks in phlegm' instead of 'hemoptysis', use 'trouble breathing when lying flat' instead of 'orthopnea').
+5. Provide natural, accurate, conversational Hindi (in Devanagari script) alongside English for every question and option.
+6. Set 'isRedFlag: true' on options that indicate serious symptoms for internal hospital prioritization, but make the option label itself calm and descriptive.
 
 Return ONLY a valid JSON array matching this exact schema:
 [
