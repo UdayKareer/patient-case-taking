@@ -13,15 +13,28 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// Allow CORS from frontend (Vite defaults to 5173, but we allow all for now)
-const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
-});
+// Restrict CORS to specific frontend domains (Vercel Prod & Localhost)
+const allowedOrigins = [
+    'https://patient-case-taking-site.vercel.app',
+    'https://patient-case-4x3k9d8uq-brij11.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+];
 
-app.use(cors());
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ["GET", "POST"]
+};
+
+const io = new Server(server, { cors: corsOptions });
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Setup Multer for file uploads (store temporarily in 'uploads' folder)
@@ -35,10 +48,24 @@ const storage = multer.diskStorage({
         cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname);
+        // Sanitize original filename to prevent directory traversal
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-]/g, '_');
+        cb(null, Date.now() + '-' + safeName);
     }
 });
-const upload = multer({ storage: storage });
+
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only JPG, PNG, and PDF are allowed.'));
+        }
+    }
+});
 
 // Socket.io for Real-Time Sync (50ms latency)
 io.on('connection', (socket) => {
@@ -107,7 +134,7 @@ app.post('/api/ocr', upload.single('document'), async (req, res) => {
 app.post('/api/clinical-ai/triage', async (req, res) => {
     try {
         const patient = req.body || {};
-        const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AQ.Ab8RN6JVZU-UpByZMxHLL7V7ThcjaFR98DELnjC2zfRreQqnew';
+        const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
         // Deterministic Clinical Fallback
         const comp = (patient.chiefComplaint || '').toLowerCase();
@@ -186,11 +213,15 @@ Return ONLY a JSON object:
   "predictedResources": ["List of medical resources"]
 }`;
 
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4500);
+
                 const response = await fetch(
                     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        signal: controller.signal,
                         body: JSON.stringify({
                             contents: [{ parts: [{ text: prompt }] }],
                             generationConfig: {
@@ -200,6 +231,7 @@ Return ONLY a JSON object:
                         })
                     }
                 );
+                clearTimeout(timeoutId);
 
                 if (response.ok) {
                     const data = await response.json();
@@ -252,7 +284,7 @@ Return ONLY a JSON object:
 app.post('/api/clinical-ai/adaptive-questions', async (req, res) => {
     try {
         const { chiefComplaint, age, gender } = req.body || {};
-        const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AQ.Ab8RN6JVZU-UpByZMxHLL7V7ThcjaFR98DELnjC2zfRreQqnew';
+        const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
         if (!GEMINI_API_KEY) {
             return res.json({ success: true, questions: [] });
@@ -283,11 +315,15 @@ Return ONLY a JSON array:
   }
 ]`;
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4500);
+
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: {
@@ -297,6 +333,7 @@ Return ONLY a JSON array:
                 })
             }
         );
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             return res.json({ success: true, questions: [] });
