@@ -172,10 +172,10 @@ export default function DoctorSidebar({ activeTab, setActiveTab, onLogout }: Doc
         <div className="p-3 bg-slate-900/90 rounded-lg border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-[11px]">
             <span className="text-slate-400 flex items-center gap-1.5">
-              <ShieldCheck size={13} className="text-teal-400" /> ABDM Gateway
+              <ShieldCheck size={13} className="text-teal-400" /> Hospital Core Network
             </span>
             <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded-md">
-              Online (M1-M3)
+              Secure Live
             </span>
           </div>
           <div className="flex items-center justify-between text-[11px]">
