@@ -205,6 +205,7 @@ interface PatientStore {
   loadPatient: (token: string) => PatientData | null;
   queueTrigger: number;
   triggerQueueUpdate: () => void;
+  clearQueue: () => Promise<void>;
   initSocket: () => void;
 }
 
@@ -919,7 +920,7 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
 
     // Department & Room routing
     let assignedDept = 'General Medicine OPD';
-    let assignedRoom = 'Room 101, Ground Floor';
+    let assignedRoom = 'Room 14, Ground Floor';
 
     if (p.mode === 'ayush') {
       assignedDept = 'AYUSH / Ayurveda Department';
@@ -1032,6 +1033,22 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
 
   queueTrigger: 0,
   triggerQueueUpdate: () => set((state) => ({ queueTrigger: state.queueTrigger + 1 })),
+
+  clearQueue: async () => {
+    // Clear local memory
+    for (const key in mockDatabase) {
+      delete mockDatabase[key];
+    }
+    get().triggerQueueUpdate();
+
+    // Clear Supabase database
+    try {
+      const { error } = await supabase.from('patients').delete().neq('token', 'DO_NOT_DELETE');
+      if (error) console.warn('Supabase clear queue error:', error.message);
+    } catch (e) {
+      console.warn('Supabase clear error:', e);
+    }
+  },
 
   initSocket: () => {
     socket.off('new_patient_in_queue');
