@@ -141,6 +141,7 @@ export interface PatientData {
   doctorNotes: string;
   status: 'waiting' | 'in_consultation' | 'accepted' | 'amended' | 'rejected' | 'admitted';
   createdAt: string;
+  createdTimestamp?: number;
 
   // In-Patient Department (IPD) / Admission Tracking
   admittedWard?: string;
@@ -968,7 +969,12 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
       get().generatePatientToken();
     }
     const token = get().currentPatient.token;
-    const fullPatient = { ...get().currentPatient, token };
+    const fullPatient = {
+      ...get().currentPatient,
+      token,
+      createdAt: get().currentPatient.createdAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdTimestamp: get().currentPatient.createdTimestamp || Date.now()
+    };
     mockDatabase[token] = fullPatient;
 
     // Sync active visit to currentProfile if logged in
