@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { io } from 'socket.io-client';
 import { supabase } from '../lib/supabase';
+import { type EsiTriageResult } from '../services/clinicalAiService';
 
 const socket = io('https://medikiosk-sih-2026.loca.lt', {
   extraHeaders: {
@@ -126,6 +127,7 @@ export interface PatientData {
   // Triage & Safety
   triageLevel: 'normal' | 'priority' | 'emergency';
   redFlags: string[];
+  esiTriage?: EsiTriageResult;
 
   // Scanned Documents & OCR
   uploadedDocuments: UploadedDocument[];
@@ -319,6 +321,24 @@ export const mockDatabase: Record<string, PatientData> = {
       'CRITICAL: Associated diaphoresis (cold sweats) and acute dyspnea',
       'HIGH RISK: Diaphoretic presentation with known DM-2 and HTN background'
     ],
+    esiTriage: {
+      level: 1,
+      category: 'Resuscitation',
+      color: '#ef4444',
+      badgeBg: 'bg-red-500/10',
+      badgeText: 'text-red-700',
+      badgeBorder: 'border-red-500/30',
+      rationale: 'Acute crushing retrosternal chest pain with left arm/jaw radiation, severe diaphoresis and dyspnea in a known diabetic. High probability of STEMI.',
+      immediateActions: [
+        'Immediate transfer to Emergency Resuscitation Bay',
+        'Stat 12-lead ECG within 10 minutes',
+        'High-sensitivity Troponin-I/T',
+        'Aspirin 300mg + Clopidogrel 300mg stat loading',
+        'Continuous cardiac telemetry & IV access'
+      ],
+      predictedResources: ['12-Lead ECG', 'Serial Cardiac Troponins', 'IV Cannulation', 'Continuous Telemetry', 'Chest Radiograph'],
+      algorithmSource: 'gemini-3.5-flash-lite'
+    },
     uploadedDocuments: [
       {
         id: 'doc-1',
@@ -404,6 +424,22 @@ export const mockDatabase: Record<string, PatientData> = {
     reviewOfSystems: ['No hematemesis, no melena', 'Morning stiffness < 30 mins', 'No inflammatory joint swelling'],
     triageLevel: 'normal',
     redFlags: [],
+    esiTriage: {
+      level: 4,
+      category: 'Less Urgent',
+      color: '#10b981',
+      badgeBg: 'bg-emerald-500/10',
+      badgeText: 'text-emerald-700',
+      badgeBorder: 'border-emerald-500/30',
+      rationale: 'Subacute chronic dyspeptic discomfort and early knee joint stiffness. Normal vital signs, no red flags. Requires single therapeutic resource.',
+      immediateActions: [
+        'Outpatient integrative consultation',
+        'Dietary counseling (Pitta-pacifying diet)',
+        'Targeted oral herbal / allopathic regimen'
+      ],
+      predictedResources: ['Outpatient Prescription', 'Dietary & Lifestyle Counseling'],
+      algorithmSource: 'gemini-3.5-flash-lite'
+    },
     uploadedDocuments: [
       {
         id: 'doc-2',
@@ -487,6 +523,23 @@ export const mockDatabase: Record<string, PatientData> = {
     redFlags: [
       'Wheezing exacerbation in known asthmatic patient'
     ],
+    esiTriage: {
+      level: 3,
+      category: 'Urgent',
+      color: '#eab308',
+      badgeBg: 'bg-amber-500/10',
+      badgeText: 'text-amber-700',
+      badgeBorder: 'border-amber-500/30',
+      rationale: 'Productive cough, low-grade fever, and wheeze in a known asthmatic. Hemodynamically stable but requires multiple diagnostic resources (CBC, PEFR, Chest X-Ray).',
+      immediateActions: [
+        'Complete Blood Count (CBC) with differential',
+        'Peak Expiratory Flow Rate (PEFR)',
+        'Chest X-Ray (PA view) if fever persists',
+        'Symptomatic bronchodilator therapy'
+      ],
+      predictedResources: ['Complete Blood Count', 'Chest Radiograph (PA)', 'Peak Flow Meter', 'Outpatient Inhaler Prescription'],
+      algorithmSource: 'gemini-3.5-flash-lite'
+    },
     uploadedDocuments: [],
     consentHistory: true,
     consentDocuments: true,
@@ -546,9 +599,26 @@ export const mockDatabase: Record<string, PatientData> = {
     allergies: [
       { allergen: 'NSAIDs (Aspirin)', reaction: 'Bronchospasm / Asthma exacerbation', severity: 'severe' }
     ],
-    reviewOfSystems: ['No hemoptysis', 'No chest pain', 'Bilateral wheezing clearing'],
     triageLevel: 'priority',
     redFlags: ['Asthma flare-up requiring inpatient monitoring'],
+    esiTriage: {
+      level: 2,
+      category: 'Emergent',
+      color: '#f97316',
+      badgeBg: 'bg-orange-500/10',
+      badgeText: 'text-orange-700',
+      badgeBorder: 'border-orange-500/30',
+      rationale: 'Severe acute exacerbation of bronchial asthma with marked expiratory wheezing, secondary lower respiratory infection, and initial SpO2 89%. High risk of acute respiratory fatigue.',
+      immediateActions: [
+        'Immediate high-flow O2 therapy titrated to SpO2 >= 94%',
+        'Nebulization with Duolin (Levosalbutamol + Ipratropium) Q4H',
+        'IV Hydrocortisone 100mg bolus TID',
+        'Continuous pulse oximetry monitoring'
+      ],
+      predictedResources: ['Continuous Pulse Oximetry', 'Nebulization Therapy', 'IV Steroids / Antibiotics', 'Arterial Blood Gas'],
+      algorithmSource: 'gemini-3.5-flash-lite'
+    },
+    reviewOfSystems: [],
     uploadedDocuments: [],
     consentHistory: true,
     consentDocuments: true,

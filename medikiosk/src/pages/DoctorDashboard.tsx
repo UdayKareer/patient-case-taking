@@ -26,6 +26,7 @@ import {
 import { usePatientStore, mockDatabase, mockProfiles, type PatientData, type IpdMedication, type IpdProgressNote, syncPatientToSupabase } from '../store/usePatientStore';
 import type { DoctorOutletContext } from '../components/DoctorLayout';
 import OPDPrescriptionModal from '../components/OPDPrescriptionModal';
+import { getEsiMetadata, calculateRuleBasedEsi, type EsiTriageResult } from '../services/clinicalAiService';
 
 interface PrescribedMedItem {
   name: string;
@@ -61,6 +62,14 @@ export default function DoctorDashboard() {
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [queueFilter, setQueueFilter] = useState<'all' | 'emergency' | 'ayush' | 'waiting'>('all');
 
+  // Feature 4D: Automated Emergency Severity Index (ESI) Triage State
+  const [showEsiOverride, setShowEsiOverride] = useState(false);
+  const [overrideEsiLevel, setOverrideEsiLevel] = useState<1 | 2 | 3 | 4 | 5>(2);
+  const [overrideEsiReason, setOverrideEsiReason] = useState('');
+
+  // Active patient ESI acuity (uses saved result or calculates rule-based fallback)
+  const activeEsi = selectedPatient.esiTriage || calculateRuleBasedEsi(selectedPatient);
+
   // In-Patient (IPD) Ward Management State
   const [showAddMedToken, setShowAddMedToken] = useState<string | null>(null);
   const [showAddNoteToken, setShowAddNoteToken] = useState<string | null>(null);
@@ -83,6 +92,57 @@ export default function DoctorDashboard() {
   const [newMedFreq, setNewMedFreq] = useState('1-0-1');
   const [newMedDuration, setNewMedDuration] = useState('7 Days');
   const [newMedInstructions, setNewMedInstructions] = useState('After food');
+
+  // Apply ESI immediate orders to clinical notes and prescription
+  const handleApplyEsiOrders = () => {
+    const ordersList = activeEsi.immediateActions || [];
+    if (ordersList.length === 0) return;
+
+    const ordersText = `\n[ESI LEVEL ${activeEsi.level} ORDERS]:\n` + ordersList.map((o) => `• ${o}`).join('\n');
+    setDoctorNotes((prev) => `${prev.trim()}\n${ordersText}`.trim());
+
+    if (activeEsi.level === 1 || selectedPatient.chiefComplaint?.toLowerCase().includes('chest')) {
+      handleApplyOrderSet('cardiac');
+    }
+
+    setStatusMessage(`✅ ESI Level ${activeEsi.level} orders added to consultation chart.`);
+    setTimeout(() => setStatusMessage(''), 3500);
+  };
+
+  // Physician override of ESI Triage Level
+  const handleConfirmEsiOverride = () => {
+    const meta = getEsiMetadata(overrideEsiLevel);
+    const updatedEsi: EsiTriageResult = {
+      level: overrideEsiLevel,
+      category: meta.category,
+      color: meta.color,
+      badgeBg: meta.badgeBg,
+      badgeText: meta.badgeText,
+      badgeBorder: meta.badgeBorder,
+      rationale: `Physician Override: ${overrideEsiReason || 'Direct bedside examination'}. (Prior: ESI Level ${activeEsi.level})`,
+      immediateActions: activeEsi.immediateActions,
+      predictedResources: activeEsi.predictedResources,
+      algorithmSource: activeEsi.algorithmSource
+    };
+
+    const newTriageLevel = overrideEsiLevel <= 2 ? 'emergency' : overrideEsiLevel === 3 ? 'priority' : 'normal';
+    const updatedPatient: PatientData = {
+      ...selectedPatient,
+      esiTriage: updatedEsi,
+      triageLevel: newTriageLevel,
+      doctorNotes: `${doctorNotes.trim()}\n[ESI OVERRIDE]: Reclassified to Level ${overrideEsiLevel} (${meta.category}) by Attending Physician. Reason: ${overrideEsiReason || 'Clinical assessment'}`.trim()
+    };
+
+    setSelectedPatient(updatedPatient);
+    if (mockDatabase[updatedPatient.token]) {
+      mockDatabase[updatedPatient.token] = updatedPatient;
+    }
+    syncPatientToSupabase(updatedPatient);
+    setShowEsiOverride(false);
+    setOverrideEsiReason('');
+    setStatusMessage(`✅ Acuity updated to ESI Level ${overrideEsiLevel} (${meta.category}).`);
+    setTimeout(() => setStatusMessage(''), 3500);
+  };
 
   // Initialize with current patient if valid
   useEffect(() => {
@@ -542,16 +602,23 @@ export default function DoctorDashboard() {
                       )}
                     </td>
                     <td className="p-4">
-                      <span className={`inline-flex items-center gap-1 font-bold text-[10px] px-2.5 py-1 rounded-full uppercase ${
-                        p.triageLevel === 'emergency'
-                          ? 'bg-red-100 text-red-700 animate-pulse'
-                          : p.triageLevel === 'priority'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {p.triageLevel === 'emergency' && <Zap size={10} />}
-                        {p.triageLevel}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`inline-flex items-center gap-1 font-bold text-[10px] px-2.5 py-0.5 rounded-full uppercase w-fit ${
+                          p.triageLevel === 'emergency'
+                            ? 'bg-red-100 text-red-700 animate-pulse'
+                            : p.triageLevel === 'priority'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          {p.triageLevel === 'emergency' && <Zap size={10} />}
+                          {p.triageLevel}
+                        </span>
+                        {p.esiTriage && (
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border w-fit ${p.esiTriage.badgeBg} ${p.esiTriage.badgeText} ${p.esiTriage.badgeBorder}`}>
+                            ESI-{p.esiTriage.level} ({p.esiTriage.category})
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -1102,16 +1169,23 @@ export default function DoctorDashboard() {
                         }`}>
                           {p.token}
                         </span>
-                        {p.triageLevel === 'emergency' && (
-                          <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full animate-pulse">
-                            EMERGENCY
-                          </span>
-                        )}
-                        {p.mode === 'ayush' && (
-                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">
-                            AYUSH
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {p.esiTriage && (
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${p.esiTriage.badgeBg} ${p.esiTriage.badgeText} ${p.esiTriage.badgeBorder}`}>
+                              ESI-{p.esiTriage.level}
+                            </span>
+                          )}
+                          {p.triageLevel === 'emergency' && !p.esiTriage && (
+                            <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full animate-pulse">
+                              EMERGENCY
+                            </span>
+                          )}
+                          {p.mode === 'ayush' && (
+                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                              AYUSH
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="font-bold text-xs text-slate-900 truncate">{p.name}</div>
                       <div className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{p.chiefComplaint}</div>
@@ -1142,14 +1216,23 @@ export default function DoctorDashboard() {
                       <span className="font-mono text-xs font-black bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md border border-slate-200">
                         {selectedPatient.token}
                       </span>
-                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                        selectedPatient.triageLevel === 'emergency'
-                          ? 'bg-red-100 text-red-700 animate-pulse'
-                          : selectedPatient.triageLevel === 'priority'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {selectedPatient.triageLevel}
+                      
+                      {/* Feature 4D: ESI Triage Ribbon Badge */}
+                      <span
+                        className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-lg border flex items-center gap-1 shadow-2xs ${
+                          activeEsi.level === 1
+                            ? 'bg-red-500/15 text-red-700 border-red-500/30 animate-pulse'
+                            : activeEsi.level === 2
+                            ? 'bg-orange-500/15 text-orange-700 border-orange-500/30'
+                            : activeEsi.level === 3
+                            ? 'bg-amber-500/15 text-amber-800 border-amber-500/30'
+                            : activeEsi.level === 4
+                            ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
+                            : 'bg-blue-500/15 text-blue-700 border-blue-500/30'
+                        }`}
+                      >
+                        <Zap size={11} className={activeEsi.level <= 2 ? 'text-red-600' : 'text-slate-500'} />
+                        ESI Level {activeEsi.level}: {activeEsi.category}
                       </span>
                     </div>
 
@@ -1521,6 +1604,159 @@ export default function DoctorDashboard() {
                       <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900">
                         Assessment & AI Differential Triage
                       </h3>
+                    </div>
+
+                    {/* Feature 4D: Automated Emergency Severity Index (ESI) Clinical Decision Support Card */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-4">
+                      
+                      {/* Top Header */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs text-white shadow-xs ${
+                              activeEsi.level === 1
+                                ? 'bg-red-600 animate-pulse'
+                                : activeEsi.level === 2
+                                ? 'bg-orange-500'
+                                : activeEsi.level === 3
+                                ? 'bg-amber-500'
+                                : activeEsi.level === 4
+                                ? 'bg-emerald-600'
+                                : 'bg-blue-600'
+                            }`}
+                          >
+                            {activeEsi.level}
+                          </span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                                ESI Level {activeEsi.level} — {activeEsi.category}
+                              </h4>
+                              <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                {activeEsi.algorithmSource === 'gemini-3.5-flash-lite' ? 'Gemini 3.5 AI Engine' : 'Clinical Rule Engine'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500">Emergency Severity Index 5-Tier Acuity Protocol</p>
+                          </div>
+                        </div>
+
+                        {/* Override Toggle Button */}
+                        <button
+                          type="button"
+                          onClick={() => setShowEsiOverride(!showEsiOverride)}
+                          className="px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                        >
+                          {showEsiOverride ? 'Close Override' : '⚙️ Triage Override'}
+                        </button>
+                      </div>
+
+                      {/* Doctor Override Drawer */}
+                      {showEsiOverride && (
+                        <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-2.5 animate-fade-in text-xs">
+                          <div className="font-bold text-amber-900 text-[11px] flex items-center gap-1.5">
+                            <AlertTriangle size={13} className="text-amber-700" />
+                            Physician Clinical Acuity Override
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-600 block mb-1">New ESI Level:</label>
+                              <select
+                                value={overrideEsiLevel}
+                                onChange={(e) => setOverrideEsiLevel(Number(e.target.value) as any)}
+                                className="w-full p-2 bg-white rounded-lg border border-slate-300 font-bold text-xs outline-none"
+                              >
+                                <option value={1}>ESI Level 1 — Resuscitation (Life-threat)</option>
+                                <option value={2}>ESI Level 2 — Emergent (High-risk)</option>
+                                <option value={3}>ESI Level 3 — Urgent (Multi-resource)</option>
+                                <option value={4}>ESI Level 4 — Less Urgent (Single-resource)</option>
+                                <option value={5}>ESI Level 5 — Non-Urgent (Zero resource)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-600 block mb-1">Clinical Override Justification:</label>
+                              <input
+                                type="text"
+                                placeholder="E.g. Hemodynamically stable upon direct exam..."
+                                value={overrideEsiReason}
+                                onChange={(e) => setOverrideEsiReason(e.target.value)}
+                                className="w-full p-2 bg-white rounded-lg border border-slate-300 text-xs outline-none"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowEsiOverride(false)}
+                              className="px-2.5 py-1 text-slate-500 hover:text-slate-800 font-semibold"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleConfirmEsiOverride}
+                              className="px-3 py-1 bg-amber-700 hover:bg-amber-800 text-white rounded-lg font-bold shadow-2xs"
+                            >
+                              Confirm Triage Override
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Clinical Rationale */}
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
+                        <span className="font-bold text-slate-700 block text-[11px]">Acuity Rationale:</span>
+                        <p className="text-slate-600 leading-relaxed">{activeEsi.rationale}</p>
+                      </div>
+
+                      {/* Recommended Immediate Clinical Orders & Resources */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        
+                        {/* Column 1: Immediate Clinical Orders */}
+                        <div className="p-3.5 bg-slate-50/90 rounded-xl border border-slate-200/80 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-800 text-[11px] flex items-center gap-1.5">
+                              <Activity size={13} className="text-teal-700" />
+                              Immediate Recommended Orders
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleApplyEsiOrders}
+                              className="text-[10px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 px-2 py-0.5 rounded border border-teal-200 transition-colors"
+                              title="Add these orders to doctor notes and prescription pad"
+                            >
+                              + Apply Orders
+                            </button>
+                          </div>
+                          <ul className="space-y-1 text-slate-700 text-[11px]">
+                            {activeEsi.immediateActions.map((action, idx) => (
+                              <li key={idx} className="flex items-start gap-1.5">
+                                <span className="text-teal-600 font-bold">•</span>
+                                <span>{action}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        {/* Column 2: Predicted Medical Resources */}
+                        <div className="p-3.5 bg-slate-50/90 rounded-xl border border-slate-200/80 space-y-2">
+                          <span className="font-bold text-slate-800 text-[11px] flex items-center gap-1.5">
+                            <Stethoscope size={13} className="text-blue-700" />
+                            Predicted Resources Required ({activeEsi.predictedResources.length})
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {activeEsi.predictedResources.map((res, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-1 rounded-md bg-white text-slate-800 text-[10px] font-semibold border border-slate-200 shadow-2xs"
+                              >
+                                {res}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                      </div>
+
                     </div>
 
                     {/* Red Flags Alert Box */}

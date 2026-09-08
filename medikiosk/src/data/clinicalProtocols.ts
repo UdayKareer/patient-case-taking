@@ -187,6 +187,98 @@ export const FEVER_OPTIONS = {
   ]
 };
 
+export const RESPIRATORY_OPTIONS = {
+  onset: [
+    { id: 'sudden_acute', labelEn: 'Sudden choking / acute onset (< 2 hours)', labelHi: 'अचानक सांस फूलना या खांसी (< 2 घंटे)', isRedFlag: true },
+    { id: 'today', labelEn: 'Started earlier today', labelHi: 'आज सुबह से शुरू हुआ' },
+    { id: 'few_days', labelEn: '3 to 5 days ago (Recent infection)', labelHi: '3 से 5 दिनों से' },
+    { id: 'chronic_weeks', labelEn: 'Chronic recurrent for weeks or months', labelHi: 'हफ्तों या महीनों से (लगातार/पुराना)' }
+  ],
+  character: [
+    { id: 'dry_hacking', labelEn: 'Dry, irritating hacking cough (No phlegm)', labelHi: 'सूखी, गले में चुभने वाली खांसी' },
+    { id: 'yellow_phlegm', labelEn: 'Productive with thick yellowish/greenish sputum', labelHi: 'गाढ़ा पीला या हरा बलगम आना' },
+    { id: 'blood_streaked', labelEn: 'Blood-streaked or rusty sputum (Hemoptysis)', labelHi: 'बलगम में खून की धारियां (हेमोप्टाइसिस)', isRedFlag: true },
+    { id: 'wheezy_tight', labelEn: 'Whistling sound / wheeze on breathing out', labelHi: 'सांस छोड़ते समय सीटी की आवाज (घरघराहट)', isRedFlag: true },
+    { id: 'barking_stridor', labelEn: 'Harsh high-pitched barking sound on inspiration', labelHi: 'गले से तेज घबराहट भरी आवाज' }
+  ],
+  radiation: [
+    { id: 'none', labelEn: 'Confined to chest & throat', labelHi: 'गले और सीने तक सीमित' },
+    { id: 'diffuse_chest', labelEn: 'Spreads across both sides of the chest', labelHi: 'सीने के दोनों तरफ फैलती है' },
+    { id: 'throat_ears', labelEn: 'Radiates upwards to ears and throat', labelHi: 'गले से कानों की तरफ दर्द जाना' }
+  ],
+  timing: [
+    { id: 'nocturnal_early', labelEn: 'Worse at 2 AM - 4 AM (Nocturnal dip)', labelHi: 'रात में 2 से 4 बजे ज्यादा तकलीफ' },
+    { id: 'morning_wake', labelEn: 'Paroxysms on waking up in the morning', labelHi: 'सुबह सोकर उठने पर खांसी के दौरे' },
+    { id: 'continuous', labelEn: 'Continuous unremitting throughout the day', labelHi: 'पूरे दिन लगातार बनी रहती है' },
+    { id: 'episodic_triggers', labelEn: 'Episodic only when exposed to cold air or dust', labelHi: 'धूल या ठंडी हवा लगने पर दौरे उठना' }
+  ],
+  aggravating: [
+    { id: 'cold_air', labelEn: 'Cold night breeze or AC', labelHi: 'ठंडी हवा या एसी में रहने पर' },
+    { id: 'dust_smoke', labelEn: 'Dust, incense, traffic pollution or smoke', labelHi: 'धूल, धुआं, अगरबत्ती या प्रदूषण' },
+    { id: 'lying_flat', labelEn: 'Lying flat on back', labelHi: 'सीधा पीठ के बल लेटने पर' },
+    { id: 'physical_exertion', labelEn: 'Walking up stairs or fast walking', labelHi: 'सीढ़ियां चढ़ने या तेज चलने पर' }
+  ],
+  relieving: [
+    { id: 'steam_inhaler', labelEn: 'Steam inhalation & warm water', labelHi: 'भाप लेने और गर्म पानी पीने से' },
+    { id: 'bronchodilator_puff', labelEn: 'Rescue inhaler puff (Salbutamol / Duolin)', labelHi: 'इनहेलर का कश लेने से' },
+    { id: 'sitting_upright', labelEn: 'Sitting upright leaning forward', labelHi: 'आगे झुककर बैठने से' },
+    { id: 'fresh_warm_air', labelEn: 'Warm environment and rest', labelHi: 'गर्म वातावरण और आराम से' }
+  ],
+  associated: [
+    { id: 'stridor_wheeze', labelEn: 'Audible wheezing / whistling in chest', labelHi: 'सीने में सीटी जैसी आवाज', isRedFlag: true },
+    { id: 'blue_lips', labelEn: 'Bluish tint on lips / fingers (Cyanosis)', labelHi: 'होंठों या नाखूनों का नीला पड़ना', isRedFlag: true },
+    { id: 'chest_heaviness', labelEn: 'Tight heavy feeling across the chest', labelHi: 'सीने में भारीपन या जकड़न' },
+    { id: 'fever_chills', labelEn: 'Fever with chills and night sweats', labelHi: 'बुखार और रात में पसीना' },
+    { id: 'nasal_rhinitis', labelEn: 'Runny nose, sneezing & itchy eyes', labelHi: 'नाक बहना, छींकें और आंखों में खुजली' }
+  ]
+};
+
+export const GI_OPTIONS = {
+  onset: [
+    { id: 'sudden_acute', labelEn: 'Acute sudden onset (< 6 hours)', labelHi: 'अचानक शुरू हुआ (< 6 घंटे)', isRedFlag: true },
+    { id: 'today', labelEn: 'Started earlier today after a meal', labelHi: 'आज भोजन के बाद शुरू हुआ' },
+    { id: 'few_days', labelEn: '2 to 4 days ago', labelHi: '2 से 4 दिनों से' },
+    { id: 'chronic_recurrent', labelEn: 'Chronic intermittent for weeks/months', labelHi: 'हफ्तों या महीनों से बार-बार' }
+  ],
+  character: [
+    { id: 'watery_liquid', labelEn: 'Frequent watery liquid stools (Bristol 7)', labelHi: 'बार-बार पानी जैसे पतले दस्त', isRedFlag: true },
+    { id: 'burning_acidity', labelEn: 'Severe burning sensation rising to throat', labelHi: 'सीने और गले में तेज खट्टी जलन' },
+    { id: 'cramping_colic', labelEn: 'Severe twisting spasmodic cramps', labelHi: 'पेट में मरोड़ और ऐंठन उठना' },
+    { id: 'dry_hard_pellets', labelEn: 'Extremely hard, painful pellet-like stool', labelHi: 'सख्त सूखा मल और अत्यधिक दर्द' },
+    { id: 'distended_gas', labelEn: 'Severe tight gas bloating & inability to pass gas', labelHi: 'पेट फूलना और गैस न निकल पाना' }
+  ],
+  radiation: [
+    { id: 'none', labelEn: 'Localized in stomach / lower belly', labelHi: 'पेट तक ही सीमित' },
+    { id: 'to_back', labelEn: 'Pierces through directly to the back', labelHi: 'सीधे पीठ की तरफ जाता है' },
+    { id: 'to_groin', labelEn: 'Shoots downward to groin area', labelHi: 'नीचे जांघों की तरफ दर्द खिंचना' }
+  ],
+  timing: [
+    { id: 'post_prandial', labelEn: 'Starts 30-60 mins after eating meals', labelHi: 'खाना खाने के 30-60 मिनट बाद' },
+    { id: 'empty_stomach', labelEn: 'Worst on empty stomach (Relieved by eating)', labelHi: 'खाली पेट ज्यादा तेज, खाने से आराम' },
+    { id: 'continuous_cramps', labelEn: 'Continuous unremitting abdominal pain', labelHi: 'लगातार बना रहने वाला दर्द', isRedFlag: true },
+    { id: 'early_morning', labelEn: 'Sudden early morning urgent bowel urge', labelHi: 'सुबह उठते ही अचानक शौच की जल्दी' }
+  ],
+  aggravating: [
+    { id: 'spicy_oily', labelEn: 'Spicy, fried or street food', labelHi: 'मसालेदार, तला-भुना या बाहर का खाना' },
+    { id: 'dairy_milk', labelEn: 'Milk, dairy or tea/coffee', labelHi: 'दूध, चाय या कॉफी पीने पर' },
+    { id: 'any_food', labelEn: 'Eating or drinking anything', labelHi: 'कुछ भी खाने-पीने पर' },
+    { id: 'stress_fasting', labelEn: 'Mental stress or prolonged fasting', labelHi: 'मानसिक तनाव या भूखे रहने पर' }
+  ],
+  relieving: [
+    { id: 'passing_stool', labelEn: 'Relieved after passing stool / flatus', labelHi: 'शौच या गैस पास होने के बाद आराम' },
+    { id: 'antacids_milk', labelEn: 'Antacid gel, cold milk or water', labelHi: 'ठंडा दूध, पानी या एंटासिड सिरप' },
+    { id: 'ors_electrolytes', labelEn: 'ORS electrolyte solution & rest', labelHi: 'ओआरएस का घोल और आराम' },
+    { id: 'warm_compress', labelEn: 'Warm compress on abdomen', labelHi: 'पेट पर गर्म सिंकाई करने से' }
+  ],
+  associated: [
+    { id: 'blood_melena', labelEn: 'Blood in stool or black tarry stools', labelHi: 'मल में खून या काला रंग', isRedFlag: true },
+    { id: 'recurrent_vomiting', labelEn: 'Unable to keep fluids down / recurrent vomiting', labelHi: 'बार-बार उल्टी, पानी न पचना', isRedFlag: true },
+    { id: 'dehydration_thirst', labelEn: 'Sunken eyes, extreme thirst, dry tongue', labelHi: 'आंखें धंसना, अत्यधिक प्यास, सूखा मुंह', isRedFlag: true },
+    { id: 'sour_burps', labelEn: 'Sour acidic belching & water brash', labelHi: 'खट्टी डकारें और मुंह में खट्टा पानी आना' },
+    { id: 'low_fever', labelEn: 'Low-grade fever and fatigue', labelHi: 'हल्का बुखार और कमजोरी' }
+  ]
+};
+
 export const AYUSH_PARIKSHA_DATA = {
   prakritiOptions: [
     { id: 'vata', labelEn: 'Vata Dominant (Lean frame, dry skin, quick energetic movements, anxiety prone)', labelHi: 'वात प्रधान (पतला शरीर, रूखी त्वचा, चंचलता, चिंता की प्रवृत्ति)' },

@@ -16,9 +16,18 @@ import {
   CHIEF_COMPLAINT_PRESETS,
   SOCRATES_OPTIONS,
   FEVER_OPTIONS,
+  RESPIRATORY_OPTIONS,
+  GI_OPTIONS
 } from '../data/clinicalProtocols';
 import { AYURVEDA_QUESTION_TREE, getStartingQuestionId } from '../data/ayurvedicProtocols';
 import { speakPrompt, createSpeechRecognizer } from '../utils/speechVoice';
+import {
+  detectClinicalDomain,
+  calculateEsiTriage,
+  generateAdaptiveQuestions,
+  type DynamicQuestion,
+  type DynamicQuestionOption
+} from '../services/clinicalAiService';
 
 export default function Consultation() {
   const navigate = useNavigate();
@@ -66,16 +75,28 @@ export default function Consultation() {
   );
   const [ayushCompleted, setAyushCompleted] = useState(false);
 
-  // Check if current complaint is fever-related to adapt question matrix
-  const isFever =
-    selectedCategory === 'fever_infections' ||
-    chiefComplaintText.toLowerCase().includes('fever') ||
-    chiefComplaintText.toLowerCase().includes('बुखार') ||
-    chiefComplaintText.toLowerCase().includes('chill') ||
-    chiefComplaintText.toLowerCase().includes('temperature');
+  // Feature 4A: Dynamically detect clinical domain (Respiratory, GI, Fever, Pain, Metabolic, General)
+  const clinicalDomain = detectClinicalDomain(chiefComplaintText);
 
-  const currentOptions = isFever ? FEVER_OPTIONS : SOCRATES_OPTIONS;
-  const totalSteps = isAyush ? 5 : 8;
+  // Select domain-specific options without forcing inappropriate pain questions
+  const currentOptions =
+    clinicalDomain === 'respiratory'
+      ? RESPIRATORY_OPTIONS
+      : clinicalDomain === 'gastrointestinal'
+      ? GI_OPTIONS
+      : clinicalDomain === 'fever'
+      ? FEVER_OPTIONS
+      : SOCRATES_OPTIONS;
+
+  // Feature 4A & 4D: Gemini adaptive follow-ups & ESI triage state
+  const [adaptiveQuestions, setAdaptiveQuestions] = useState<DynamicQuestion[]>([]);
+  const [adaptiveAnswers, setAdaptiveAnswers] = useState<Record<string, string>>({});
+  const [loadingAdaptive, setLoadingAdaptive] = useState(false);
+  const [detectedRedFlags, setDetectedRedFlags] = useState<string[]>(currentPatient.redFlags || []);
+  const [isCalculatingEsi, setIsCalculatingEsi] = useState(false);
+
+  // Steps: 9 for Modern Medicine (Step 0 to 8 including Gemini Adaptive Questioning), 5 for AYUSH
+  const totalSteps = isAyush ? 5 : 9;
 
   // Determine Ayush Start node based on complaint
   useEffect(() => {
@@ -91,6 +112,27 @@ export default function Consultation() {
     }
   }, [currentStep, isAyush, chiefComplaintText, ayushCompleted]);
 
+  // Load Gemini adaptive follow-up questions for Step 8 (Feature 4A)
+  useEffect(() => {
+    if (currentStep === 8 && !isAyush && adaptiveQuestions.length === 0) {
+      setLoadingAdaptive(true);
+      generateAdaptiveQuestions(
+        chiefComplaintText,
+        currentPatient.age || 'Adult',
+        currentPatient.gender || 'Unknown'
+      )
+        .then((questions) => {
+          setAdaptiveQuestions(questions);
+        })
+        .catch((err) => {
+          console.warn('Failed to load adaptive questions:', err);
+        })
+        .finally(() => {
+          setLoadingAdaptive(false);
+        });
+    }
+  }, [currentStep, isAyush, chiefComplaintText, adaptiveQuestions.length, currentPatient.age, currentPatient.gender]);
+
   // Read aloud prompt when step changes
   useEffect(() => {
     if (!soundEnabled) return;
@@ -103,16 +145,52 @@ export default function Consultation() {
     } else if (!isAyush) {
       if (currentStep === 1) {
         textToSpeak = isHindi
-          ? isFever ? 'बुखार कब से शुरू हुआ है?' : 'यह तकलीफ कब से शुरू हुई?'
-          : isFever ? 'When did the fever first start?' : 'When did these symptoms first start?';
+          ? clinicalDomain === 'fever'
+            ? 'बुखार कब से शुरू हुआ है?'
+            : clinicalDomain === 'respiratory'
+            ? 'खांसी या सांस की तकलीफ कब से शुरू हुई?'
+            : clinicalDomain === 'gastrointestinal'
+            ? 'पेट या पाचन की परेशानी कब से शुरू हुई?'
+            : 'यह तकलीफ कब से शुरू हुई?'
+          : clinicalDomain === 'fever'
+          ? 'When did the fever first start?'
+          : clinicalDomain === 'respiratory'
+          ? 'When did the cough or breathing trouble start?'
+          : clinicalDomain === 'gastrointestinal'
+          ? 'When did the digestive or stomach discomfort start?'
+          : 'When did these symptoms first start?';
       } else if (currentStep === 2) {
         textToSpeak = isHindi
-          ? isFever ? 'बुखार कैसा महसूस हो रहा है? क्या कंपकंपी है?' : 'तकलीफ का अहसास कैसा है? क्या यह भारी दबाव है या तेज जलन?'
-          : isFever ? 'How does the fever feel? Is there shivering or body ache?' : 'What does the discomfort feel like?';
+          ? clinicalDomain === 'fever'
+            ? 'बुखार कैसा महसूस हो रहा है? क्या कंपकंपी है?'
+            : clinicalDomain === 'respiratory'
+            ? 'खांसी और बलगम का स्वरूप कैसा है?'
+            : clinicalDomain === 'gastrointestinal'
+            ? 'पेट या शौच का स्वरूप कैसा है?'
+            : 'तकलीफ का अहसास कैसा है?'
+          : clinicalDomain === 'fever'
+          ? 'How does the fever feel?'
+          : clinicalDomain === 'respiratory'
+          ? 'What is the character of your cough or sputum?'
+          : clinicalDomain === 'gastrointestinal'
+          ? 'What does the digestive discomfort feel like?'
+          : 'What does the discomfort feel like?';
       } else if (currentStep === 3) {
         textToSpeak = isHindi
-          ? isFever ? 'बुखार का असर शरीर के किन हिस्सों में ज्यादा है?' : 'क्या यह दर्द शरीर में कहीं और भी फैलता है?'
-          : isFever ? 'Which parts of your body are most affected by the fever?' : 'Does the pain spread anywhere else?';
+          ? clinicalDomain === 'fever'
+            ? 'बुखार का असर शरीर के किन हिस्सों में ज्यादा है?'
+            : clinicalDomain === 'respiratory'
+            ? 'सांस या जकड़न का असर सीने में कहां महसूस हो रहा है?'
+            : clinicalDomain === 'gastrointestinal'
+            ? 'पेट में तकलीफ किस जगह है, क्या यह कहीं और फैलती है?'
+            : 'क्या यह दर्द शरीर में कहीं और भी फैलता है?'
+          : clinicalDomain === 'fever'
+          ? 'Which parts of your body are most affected by the fever?'
+          : clinicalDomain === 'respiratory'
+          ? 'Which areas of your chest and throat are affected?'
+          : clinicalDomain === 'gastrointestinal'
+          ? 'Where in your abdomen is the discomfort located?'
+          : 'Does the pain spread anywhere else?';
       } else if (currentStep === 4) {
         textToSpeak = isHindi
           ? 'तकलीफ की तीव्रता एक से दस के पैमाने पर कितनी है?'
@@ -123,6 +201,10 @@ export default function Consultation() {
         textToSpeak = isHindi ? 'तकलीफ किस चीज से बढ़ती है?' : 'What makes your symptoms worse?';
       } else if (currentStep === 7) {
         textToSpeak = isHindi ? 'किस चीज से आराम मिलता है?' : 'What provides relief?';
+      } else if (currentStep === 8) {
+        textToSpeak = isHindi
+          ? 'सटीक नैदानिक मूल्यांकन के लिए इन अनुकूली सवालों के जवाब दें।'
+          : 'Please answer these targeted adaptive questions formulated by Gemini AI.';
       }
     } else if (isAyush) {
       if (currentStep === 1 && !ayushCompleted) {
@@ -138,7 +220,7 @@ export default function Consultation() {
     if (textToSpeak) {
       speakPrompt(textToSpeak, currentPatient.language);
     }
-  }, [currentStep, soundEnabled, isHindi, isAyush, isFever, currentPatient.language, activeAyushQuestionId, ayushCompleted]);
+  }, [currentStep, soundEnabled, isHindi, isAyush, clinicalDomain, currentPatient.language, activeAyushQuestionId, ayushCompleted]);
 
   // Voice recording toggle for any field
   const toggleVoice = (fieldName: string, setter: (val: string) => void) => {
@@ -173,8 +255,23 @@ export default function Consultation() {
     }
   };
 
-  // Sync to store & advance
-  const advance = (nextStepIndex?: number) => {
+  // Handle adaptive option selection with red flag tracking
+  const handleSelectAdaptiveOption = (questionId: string, option: DynamicQuestionOption) => {
+    setAdaptiveAnswers((prev) => ({
+      ...prev,
+      [questionId]: isHindi ? option.labelHi : option.labelEn
+    }));
+
+    if (option.isRedFlag) {
+      const flagText = `[AI Alert]: ${option.labelEn}`;
+      if (!detectedRedFlags.includes(flagText)) {
+        setDetectedRedFlags((prev) => [...prev, flagText]);
+      }
+    }
+  };
+
+  // Sync to store & advance with automated ESI triage (Feature 4D)
+  const advance = async (nextStepIndex?: number) => {
     const nextIdx = nextStepIndex !== undefined ? nextStepIndex : currentStep + 1;
 
     const finalAssociated = [...associated];
@@ -192,6 +289,7 @@ export default function Consultation() {
       aggravatingFactors: aggravating,
       relievingFactors: relieving,
       associatedSymptoms: finalAssociated,
+      redFlags: detectedRedFlags,
       prakriti,
       agni,
       koshtha,
@@ -204,10 +302,44 @@ export default function Consultation() {
     if (nextIdx < totalSteps) {
       setCurrentStep(nextIdx);
     } else {
-      // Complete intake & route
-      evaluateTriageAndSummary();
-      saveToDatabase();
-      navigate('/summary');
+      // Feature 4D: Compute Automated Emergency Severity Index (ESI) Triage via Gemini 3.5 & Rule Engine
+      setIsCalculatingEsi(true);
+      try {
+        const esiResult = await calculateEsiTriage({
+          name: currentPatient.name,
+          age: currentPatient.age,
+          gender: currentPatient.gender,
+          chiefComplaint: chiefComplaintText,
+          symptomDuration: duration,
+          symptomSite: site,
+          symptomCharacter: character,
+          symptomRadiation: radiation,
+          symptomSeverity: severity,
+          aggravatingFactors: aggravating,
+          relievingFactors: relieving,
+          associatedSymptoms: finalAssociated,
+          chronicConditions: currentPatient.chronicConditions,
+          allergies: currentPatient.allergies,
+          redFlags: detectedRedFlags,
+          triageLevel: currentPatient.triageLevel
+        });
+
+        const computedTriage: 'emergency' | 'priority' | 'normal' =
+          esiResult.level <= 2 ? 'emergency' : esiResult.level === 3 ? 'priority' : 'normal';
+
+        updatePatient({
+          esiTriage: esiResult,
+          triageLevel: computedTriage,
+          redFlags: detectedRedFlags
+        });
+      } catch (err) {
+        console.warn('ESI calculation error:', err);
+      } finally {
+        setIsCalculatingEsi(false);
+        evaluateTriageAndSummary();
+        saveToDatabase();
+        navigate('/summary');
+      }
     }
   };
 
@@ -391,8 +523,20 @@ export default function Consultation() {
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
                 {isHindi
-                  ? isFever ? 'बुखार या तकलीफ कब से शुरू हुई?' : 'यह तकलीफ कब से शुरू हुई?'
-                  : isFever ? 'When did the fever or symptoms start?' : 'When did these symptoms first start?'}
+                  ? clinicalDomain === 'fever'
+                    ? 'बुखार या तकलीफ कब से शुरू हुई?'
+                    : clinicalDomain === 'respiratory'
+                    ? 'खांसी या सांस की तकलीफ कब से शुरू हुई?'
+                    : clinicalDomain === 'gastrointestinal'
+                    ? 'पेट या पाचन की परेशानी कब से शुरू हुई?'
+                    : 'यह तकलीफ कब से शुरू हुई?'
+                  : clinicalDomain === 'fever'
+                  ? 'When did the fever or illness start?'
+                  : clinicalDomain === 'respiratory'
+                  ? 'When did the cough or breathing difficulty start?'
+                  : clinicalDomain === 'gastrointestinal'
+                  ? 'When did the digestive or stomach discomfort start?'
+                  : 'When did these symptoms first start?'}
               </h2>
             </div>
 
@@ -446,8 +590,20 @@ export default function Consultation() {
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
                 {isHindi
-                  ? isFever ? 'बुखार और तकलीफ का अहसास कैसा है?' : 'तकलीफ का अहसास कैसा है?'
-                  : isFever ? 'How does the fever feel?' : 'What does the sensation feel like?'}
+                  ? clinicalDomain === 'fever'
+                    ? 'बुखार और तकलीफ का अहसास कैसा है?'
+                    : clinicalDomain === 'respiratory'
+                    ? 'खांसी और बलगम का स्वरूप कैसा है?'
+                    : clinicalDomain === 'gastrointestinal'
+                    ? 'पेट या पाचन की परेशानी कैसी महसूस हो रही है?'
+                    : 'तकलीफ का अहसास कैसा है?'
+                  : clinicalDomain === 'fever'
+                  ? 'How does the fever feel?'
+                  : clinicalDomain === 'respiratory'
+                  ? 'What is the character of your cough or breathing?'
+                  : clinicalDomain === 'gastrointestinal'
+                  ? 'What does the digestive discomfort feel like?'
+                  : 'What does the sensation feel like?'}
               </h2>
             </div>
 
@@ -501,8 +657,20 @@ export default function Consultation() {
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
                 {isHindi
-                  ? isFever ? 'असर शरीर के किन हिस्सों में ज्यादा महसूस हो रहा है?' : 'क्या दर्द शरीर में कहीं और फैलता है?'
-                  : isFever ? 'Which regions are most affected by the illness?' : 'Does the discomfort spread anywhere else?'}
+                  ? clinicalDomain === 'fever'
+                    ? 'असर शरीर के किन हिस्सों में ज्यादा महसूस हो रहा है?'
+                    : clinicalDomain === 'respiratory'
+                    ? 'सांस या जकड़न का असर सीने में कहां महसूस हो रहा है?'
+                    : clinicalDomain === 'gastrointestinal'
+                    ? 'पेट में तकलीफ किस जगह है, क्या यह कहीं और फैलती है?'
+                    : 'क्या दर्द शरीर में कहीं और फैलता है?'
+                  : clinicalDomain === 'fever'
+                  ? 'Which regions are most affected by the fever?'
+                  : clinicalDomain === 'respiratory'
+                  ? 'Which areas of your chest and throat are affected?'
+                  : clinicalDomain === 'gastrointestinal'
+                  ? 'Where in your abdomen is the discomfort located?'
+                  : 'Does the discomfort spread anywhere else?'}
               </h2>
             </div>
 
@@ -770,6 +938,86 @@ export default function Consultation() {
           </div>
         )}
 
+        {/* STEP 8: AI Adaptive Clinical Follow-up (Feature 4A with Gemini 3.5 Flash-lite) */}
+        {currentStep === 8 && !isAyush && (
+          <div className="animate-slide-up space-y-6">
+            <div className="text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center justify-center gap-1.5 mb-1">
+                <Sparkles size={14} className="text-blue-600 animate-pulse" />
+                {isHindi ? 'कदम 9: एआई अनुकूली नैदानिक प्रश्न' : 'Step 9: AI Adaptive Clinical Follow-up'}
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                {isHindi ? 'सटीक निदान के लिए लक्षित प्रश्न' : 'Targeted Clinical Follow-up Questions'}
+              </h2>
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                {isHindi
+                  ? 'जेमिनी एआई ने आपके लक्षणों के आधार पर इन प्रश्नों को तैयार किया है।'
+                  : 'Formulated by Gemini 3.5 Clinical Intelligence to identify critical differential markers.'}
+              </p>
+            </div>
+
+            {loadingAdaptive ? (
+              <div className="p-8 bg-blue-50/50 rounded-2xl border border-blue-200/80 text-center space-y-3">
+                <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-xs font-bold text-blue-900">
+                  {isHindi ? 'जेमिनी एआई अनुकूली प्रश्न तैयार कर रहा है...' : 'Gemini AI is analyzing clinical presentation & generating questions...'}
+                </p>
+              </div>
+            ) : adaptiveQuestions.length > 0 ? (
+              <div className="space-y-4 max-w-lg mx-auto">
+                {adaptiveQuestions.map((q, qIdx) => (
+                  <div key={q.id || qIdx} className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {qIdx + 1}. {isHindi ? q.questionHi : q.questionEn}
+                      </h3>
+                      <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 shrink-0">
+                        Gemini 3.5
+                      </span>
+                    </div>
+                    {q.clinicalRationale && (
+                      <p className="text-[11px] text-slate-500 italic bg-slate-50 p-2 rounded-lg border border-slate-100">
+                        {q.clinicalRationale}
+                      </p>
+                    )}
+                    <div className="space-y-1.5">
+                      {q.options.map((opt) => {
+                        const isSelected = adaptiveAnswers[q.id] === (isHindi ? opt.labelHi : opt.labelEn);
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => handleSelectAdaptiveOption(q.id, opt)}
+                            className={`w-full p-3 rounded-xl border text-xs font-semibold text-left transition-all flex items-center justify-between ${
+                              isSelected
+                                ? 'bg-blue-50 border-blue-600 text-blue-900 shadow-2xs'
+                                : 'bg-white border-slate-200 hover:border-slate-300 text-slate-800'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              {opt.isRedFlag && (
+                                <span className="text-[10px] font-black text-red-700 bg-red-100 px-1.5 py-0.5 rounded uppercase">
+                                  Warning
+                                </span>
+                              )}
+                              <span>{isHindi ? opt.labelHi : opt.labelEn}</span>
+                            </div>
+                            {isSelected && <CheckCircle2 size={16} className="text-blue-600 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-center text-xs text-slate-600">
+                {isHindi ? 'कोई अतिरिक्त प्रश्न नहीं। आगे बढ़ें।' : 'Standard protocol completed. Click Continue to finalize triage.'}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* STEP 1 (AYUSH): Dynamic Pariksha Question Tree */}
         {currentStep === 1 && isAyush && (
           <div className="animate-slide-up space-y-6">
@@ -971,25 +1219,51 @@ export default function Consultation() {
         <button
           type="button"
           onClick={() => advance()}
-          disabled={currentStep === 0 && !chiefComplaintText.trim()}
+          disabled={(currentStep === 0 && !chiefComplaintText.trim()) || isCalculatingEsi}
           className={`px-5 py-2.5 rounded-lg font-medium text-xs sm:text-sm flex items-center gap-2 transition-all shadow-xs ${
-            currentStep === 0 && !chiefComplaintText.trim()
+            (currentStep === 0 && !chiefComplaintText.trim()) || isCalculatingEsi
               ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
               : 'bg-blue-600 hover:bg-blue-700 text-white'
           }`}
         >
-          <span>
-            {currentStep === totalSteps - 1
-              ? isHindi
-                ? 'ओपीडी कक्ष व टोकन प्राप्त करें'
-                : 'Confirm OPD & Get Token'
-              : isHindi
-              ? 'आगे बढ़ें'
-              : 'Continue'}
-          </span>
-          <ArrowRight size={15} />
+          {isCalculatingEsi ? (
+            <div className="flex items-center gap-2">
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span>{isHindi ? 'गणना जारी है...' : 'Calculating ESI...'}</span>
+            </div>
+          ) : (
+            <>
+              <span>
+                {currentStep === totalSteps - 1
+                  ? isHindi
+                    ? 'ओपीडी कक्ष व टोकन प्राप्त करें'
+                    : 'Confirm OPD & Get Token'
+                  : isHindi
+                  ? 'आगे बढ़ें'
+                  : 'Continue'}
+              </span>
+              <ArrowRight size={15} />
+            </>
+          )}
         </button>
       </div>
+
+      {/* Feature 4D: Calculating ESI Triage Modal */}
+      {isCalculatingEsi && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl max-w-sm w-full text-center space-y-3">
+            <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+            <h3 className="font-bold text-slate-900 text-sm">
+              {isHindi ? 'आपातकालीन तीव्रता (ESI) विश्लेषण' : 'Evaluating ESI Triage Engine'}
+            </h3>
+            <p className="text-xs text-slate-500">
+              {isHindi
+                ? 'लक्षणों और महत्वपूर्ण संकेतों का जेमिनी 3.5 एआई द्वारा विश्लेषण किया जा रहा है...'
+                : 'Scoring acuity, vital parameters & red flags via Gemini 3.5 Flash-lite...'}
+            </p>
+          </div>
+        </div>
+      )}
 
     </div>
   );

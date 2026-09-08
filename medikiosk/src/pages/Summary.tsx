@@ -91,6 +91,41 @@ export default function Summary() {
             : 'Your symptoms and clinical intake have been transferred to the attending physician. Please proceed to the station below.'}
         </p>
 
+        {/* Patient-Friendly ESI Triage Card (Feature 4D) */}
+        {currentPatient.esiTriage && (
+          <div
+            className={`mt-6 p-4 rounded-xl border text-left ${
+              currentPatient.esiTriage.level <= 2
+                ? 'bg-red-50/80 border-red-200 text-red-950'
+                : currentPatient.esiTriage.level === 3
+                ? 'bg-amber-50/80 border-amber-200 text-amber-950'
+                : 'bg-blue-50/80 border-blue-200 text-blue-950'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-white/80 border border-current">
+                {isHindi ? `प्राथमिकता स्तर: ESI-${currentPatient.esiTriage.level}` : `Triage Priority: ESI-${currentPatient.esiTriage.level}`}
+              </span>
+              <span className="text-[10px] font-bold">
+                {currentPatient.esiTriage.level <= 2
+                  ? isHindi ? '🚨 तत्काल ध्यान अपेक्षित' : '🚨 Immediate Attention Required'
+                  : currentPatient.esiTriage.level === 3
+                  ? isHindi ? '⚠️ प्राथमिक परामर्श' : '⚠️ Priority Evaluation'
+                  : isHindi ? '✓ नियमित परामर्श' : '✓ Standard Care'}
+              </span>
+            </div>
+            <p className="text-xs font-medium leading-relaxed">
+              {currentPatient.esiTriage.level <= 2
+                ? isHindi
+                  ? 'आपके लक्षणों के आधार पर आपको तत्काल प्राथमिकता दी गई है। कृपया सीधे नर्सिंग काउंटर या आपातकालीन कक्ष में संपर्क करें।'
+                  : 'Based on your symptoms, your intake has been escalated to High Priority. Please inform the triage nurse immediately.'
+                : isHindi
+                ? 'आपकी जानकारी ओपीडी परामर्श कक्ष को प्रेषित कर दी गई है। कृपया निर्धारित कक्ष के बाहर प्रतीक्षा करें।'
+                : 'Your intake details have been transmitted to the OPD desk. Diagnostic resources have been pre-allocated.'}
+            </p>
+          </div>
+        )}
+
         {/* OPD Routing Box */}
         <div className="mt-6 p-6 rounded-xl bg-slate-50/80 border border-slate-200/80 text-slate-900 text-center">
           <div className="flex flex-col items-center justify-center">
@@ -103,7 +138,7 @@ export default function Summary() {
             
             <div className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-2xs">
               <Clock size={13} className="text-slate-400" />
-              <span>Queue Status: Active • Est. wait ~15 min</span>
+              <span>Queue Status: Active • Token: {currentPatient.token}</span>
             </div>
           </div>
         </div>
