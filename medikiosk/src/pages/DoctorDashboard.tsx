@@ -28,7 +28,10 @@ import {
   Paperclip,
   Mic,
   MicOff,
-  RefreshCw
+  RefreshCw,
+  CheckCircle2,
+  Edit3,
+  X
 } from 'lucide-react';
 import { usePatientStore, mockDatabase, mockProfiles, type PatientData, type IpdMedication, type IpdProgressNote, type UploadedDocument, syncPatientToSupabase } from '../store/usePatientStore';
 import type { DoctorOutletContext } from '../components/DoctorLayout';
@@ -36,7 +39,7 @@ import OPDPrescriptionModal from '../components/OPDPrescriptionModal';
 import DocumentViewerModal from '../components/DocumentViewerModal';
 import { UnifiedVoiceSession, type VoiceState } from '../services/whisperService';
 import { getEsiMetadata, calculateRuleBasedEsi, type EsiTriageResult } from '../services/clinicalAiService';
-import { NAMASTE_ICD11_PRESETS, type NamasteDiagnosisItem } from '../data/clinicalProtocols';
+import { NAMASTE_ICD11_PRESETS, type NamasteDiagnosisItem, type DashavidhaData, type AshtaSthanaData } from '../data/clinicalProtocols';
 import { offlineSyncService } from '../services/offlineSyncService';
 
 interface PrescribedMedItem {
@@ -189,6 +192,108 @@ export default function DoctorDashboard() {
     } finally {
       setIsSyncingOffline(false);
       setTimeout(() => setStatusMessage(''), 4000);
+    }
+  };
+
+  // Doctor / Nurse Bedside Physical Examination State (Dashavidha & Ashta Sthana)
+  const [isEditingIntegrativeExam, setIsEditingIntegrativeExam] = useState(false);
+  const [examDashavidha, setExamDashavidha] = useState<Partial<DashavidhaData>>(selectedPatient.dashavidha || {});
+  const [examAshtaSthana, setExamAshtaSthana] = useState<Partial<AshtaSthanaData>>(selectedPatient.ashtaSthana || {});
+
+  useEffect(() => {
+    setExamDashavidha(selectedPatient.dashavidha || {});
+    setExamAshtaSthana(selectedPatient.ashtaSthana || {});
+    setIsEditingIntegrativeExam(false);
+  }, [selectedPatient.token]);
+
+  const isExamDocumented = Boolean(selectedPatient.ashtaSthana?.nadi || selectedPatient.dashavidha?.sara);
+
+  const handleSaveIntegrativeExam = () => {
+    const updated: PatientData = {
+      ...selectedPatient,
+      dashavidha: { ...(selectedPatient.dashavidha || {}), ...examDashavidha },
+      ashtaSthana: { ...(selectedPatient.ashtaSthana || {}), ...examAshtaSthana }
+    };
+    setSelectedPatient(updated);
+    if (mockDatabase[updated.token]) {
+      mockDatabase[updated.token] = updated;
+    }
+    syncPatientToSupabase(updated);
+    setIsEditingIntegrativeExam(false);
+    setStatusMessage('✅ Bedside physical examination recorded by physician and saved to patient EHR history.');
+    setTimeout(() => setStatusMessage(''), 4000);
+  };
+
+  const applyExamPreset = (preset: 'normal' | 'pitta' | 'vata') => {
+    if (preset === 'normal') {
+      setExamDashavidha({
+        prakriti: 'Vata-Pitta Combination',
+        vikriti: 'Doshic Equilibrium (No acute morbidity)',
+        sara: 'Pravara Reserve (Robust tissue stamina & tone)',
+        samhanana: 'Compact & Robust (Samhanana Pravara)',
+        pramana: 'Proportionate & Symmetrical (Normal BMI)',
+        satmya: 'Sarva-rasa Satmya (High dietary & environmental adaptability)',
+        sattva: 'Pravara Sattva (High emotional fortitude & stress tolerance)',
+        aharaShakti: 'Samagni (Balanced appetite and digestion)',
+        vyayamaShakti: 'Pravara (High exertional stamina)',
+        vaya: `${selectedPatient.age || 'Adult'} Yrs - Madhyama Phase`
+      });
+      setExamAshtaSthana({
+        nadi: 'Normal Vata-Pitta Rhythm (72 bpm, regular)',
+        mutra: 'Clear Pale Yellow (Avishesha)',
+        mala: 'Normal Formed Daily (Sukha Pravritti)',
+        jihwa: 'Clean Pink & Moist (Nirama)',
+        shabda: 'Clear & Resonant (Spashta)',
+        sparsha: 'Normal Warm & Soft (Prakrita)',
+        druk: 'Clear Sclera & Lustrous',
+        akruti: 'Comfortable & Calm (Prakrita)'
+      });
+    } else if (preset === 'pitta') {
+      setExamDashavidha({
+        prakriti: 'Pitta-Vata Combination',
+        vikriti: 'Pitta Imbalance (Hyperacidity, Vidaha, Gastric distress)',
+        sara: 'Madhyama Reserve (Average tissue stamina)',
+        samhanana: 'Average Build (Balanced skeletal tone)',
+        pramana: 'Proportionate & Symmetrical',
+        satmya: 'Moderate Adaptability (Sensitive to spicy foods & heat)',
+        sattva: 'Madhyama Resilience (Moderate coping under stress)',
+        aharaShakti: 'Tikshnagni (Hyperacidic / Rapid hunger)',
+        vyayamaShakti: 'Moderate Endurance',
+        vaya: `${selectedPatient.age || 'Adult'} Yrs - Madhyama Phase`
+      });
+      setExamAshtaSthana({
+        nadi: 'Rapid & Bounding (Mandukagati, 78 bpm)',
+        mutra: 'Concentrated Dark Yellow / Burning',
+        mala: 'Constipated & Hard (Krura Koshtha)',
+        jihwa: 'Red Margins with Mild White Coating (Pitta-Sama)',
+        shabda: 'Clear & Resonant (Spashta)',
+        sparsha: 'Warm & Mildly Sweaty (Ushna)',
+        druk: 'Clear with Mild Scleral Injection',
+        akruti: 'Mild Pain Facies (Kastam)'
+      });
+    } else if (preset === 'vata') {
+      setExamDashavidha({
+        prakriti: 'Vata-Kapha Combination',
+        vikriti: 'Vata Imbalance (Musculoskeletal stiffness, Joint crepitus, Pain)',
+        sara: 'Avara Reserve (Depleted tissue tone)',
+        samhanana: 'Lean / Asthenic Build (Avara)',
+        pramana: 'Mildly Disproportionate (Thin extremities)',
+        satmya: 'Low Adaptability (Cold sensitive, Dry food intolerance)',
+        sattva: 'Madhyama Sattva (Anxiety prone under acute pain)',
+        aharaShakti: 'Vishamagni (Erratic appetite & bloating)',
+        vyayamaShakti: 'Avara (Tires rapidly on physical exertion)',
+        vaya: `${selectedPatient.age || 'Adult'} Yrs - Mature Phase`
+      });
+      setExamAshtaSthana({
+        nadi: 'Thin, Rapid & Feeble (Sarpagati, 82 bpm)',
+        mutra: 'Scanty Pale Yellow',
+        mala: 'Hard, Dry & Infrequent (Krura Koshtha)',
+        jihwa: 'Dry & Fissured (Ruksha-Jihwa)',
+        shabda: 'Low Volume / Feeble Phonation',
+        sparsha: 'Cold & Dry Extremities (Sheeta-Ruksha)',
+        druk: 'Sunken & Dry Conjunctiva',
+        akruti: 'Guarded Painful Posture (Shoola Facies)'
+      });
     }
   };
 
@@ -2885,6 +2990,402 @@ export default function DoctorDashboard() {
                     </div>
                   </div>
 
+                  {/* Bedside Physical Examination Status Banner & Action Trigger */}
+                  <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                    isExamDocumented 
+                      ? 'bg-emerald-50/60 border-emerald-200 text-emerald-950' 
+                      : 'bg-amber-50/70 border-amber-200 text-amber-950'
+                  }`}>
+                    <div className="flex items-start gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                        isExamDocumented ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {isExamDocumented ? <CheckCircle2 size={18} /> : <Stethoscope size={18} />}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black uppercase tracking-wide">
+                            {isExamDocumented 
+                              ? 'Bedside Physical Examination Documented & Verified' 
+                              : 'Bedside Physical Examination Pending'}
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isExamDocumented 
+                              ? 'bg-emerald-200/80 text-emerald-900' 
+                              : 'bg-amber-200/80 text-amber-900 animate-pulse'
+                          }`}>
+                            {isExamDocumented ? 'Clinician Exam on File' : 'Bedside Exam Required'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                          {isExamDocumented
+                            ? 'Formal systemic tissue vitality (Sara, Samhanana) and bedside physical matrix (Nadi, Jihwa, Sparsha) recorded by attending clinician.'
+                            : 'Patient submitted subjective symptoms at kiosk. Direct physical examination (Pulse/Nadi, Tongue/Jihwa, tissue vitality) must be performed bedside in OPD Room 14.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingIntegrativeExam(!isEditingIntegrativeExam)}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer ${
+                          isEditingIntegrativeExam
+                            ? 'bg-slate-800 text-white hover:bg-slate-900'
+                            : isExamDocumented
+                            ? 'bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50'
+                            : 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                        }`}
+                      >
+                        {isEditingIntegrativeExam ? (
+                          <>
+                            <X size={13} />
+                            <span>Close Exam Pad</span>
+                          </>
+                        ) : isExamDocumented ? (
+                          <>
+                            <Edit3 size={13} />
+                            <span>Edit / Re-Examine Bedside</span>
+                          </>
+                        ) : (
+                          <>
+                            <Stethoscope size={13} />
+                            <span>Record Bedside Physical Exam</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Bedside Physical Examination Entry Pad (Drawer/Editor) */}
+                  {isEditingIntegrativeExam && (
+                    <div className="p-5 rounded-2xl bg-slate-50 border-2 border-emerald-500/40 shadow-sm space-y-5 animate-fade-in">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                        <div>
+                          <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                            <Stethoscope size={15} className="text-emerald-700" />
+                            <span>Bedside Physical Examination Entry (Charaka & Sushruta Standard Matrix)</span>
+                          </h4>
+                          <p className="text-[11px] text-slate-500">
+                            Perform physical examination and enter bedside findings below. Use 1-click clinical presets for fast OPD throughput.
+                          </p>
+                        </div>
+
+                        {/* Quick Presets */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fast Presets:</span>
+                          <button
+                            type="button"
+                            onClick={() => applyExamPreset('normal')}
+                            className="px-2.5 py-1 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 rounded-lg text-[11px] font-bold transition-all shadow-2xs cursor-pointer"
+                          >
+                            🌿 Normal Baseline
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyExamPreset('pitta')}
+                            className="px-2.5 py-1 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-300 text-slate-700 rounded-lg text-[11px] font-bold transition-all shadow-2xs cursor-pointer"
+                          >
+                            🔥 Pitta Flare (Acidity)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyExamPreset('vata')}
+                            className="px-2.5 py-1 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-700 rounded-lg text-[11px] font-bold transition-all shadow-2xs cursor-pointer"
+                          >
+                            💨 Vata Flare (Stiffness)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Part A: 8-Point Bedside Physical Matrix (Ashta Sthana) */}
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-md bg-blue-600 text-white text-[10px] font-black flex items-center justify-center">
+                            8
+                          </span>
+                          <h5 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                            Part A: 8-Point Bedside Physical Examination Matrix (Ashta Sthana)
+                          </h5>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                          {/* 1. Nadi */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-blue-800 uppercase block">1. Pulse (Nadi)</label>
+                            <input
+                              type="text"
+                              value={examAshtaSthana.nadi || ''}
+                              onChange={(e) => setExamAshtaSthana({ ...examAshtaSthana, nadi: e.target.value })}
+                              placeholder="e.g. Rapid & Bounding (78 bpm)"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Rhythm, rate & dosha gati</span>
+                          </div>
+
+                          {/* 2. Mutra */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-blue-800 uppercase block">2. Urine (Mutra)</label>
+                            <input
+                              type="text"
+                              value={examAshtaSthana.mutra || ''}
+                              onChange={(e) => setExamAshtaSthana({ ...examAshtaSthana, mutra: e.target.value })}
+                              placeholder="e.g. Clear Pale Yellow"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Hydration, color & burning</span>
+                          </div>
+
+                          {/* 3. Mala */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-blue-800 uppercase block">3. Bowel (Mala / Koshtha)</label>
+                            <input
+                              type="text"
+                              value={examAshtaSthana.mala || ''}
+                              onChange={(e) => setExamAshtaSthana({ ...examAshtaSthana, mala: e.target.value })}
+                              placeholder="e.g. Constipated & Hard (Krura)"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Stool frequency & consistency</span>
+                          </div>
+
+                          {/* 4. Jihwa */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-blue-800 uppercase block">4. Tongue (Jihwa)</label>
+                            <input
+                              type="text"
+                              value={examAshtaSthana.jihwa || ''}
+                              onChange={(e) => setExamAshtaSthana({ ...examAshtaSthana, jihwa: e.target.value })}
+                              placeholder="e.g. Red Margins with White Fur"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Oral coating (Sama/Nirama)</span>
+                          </div>
+
+                          {/* 5. Shabda */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-blue-800 uppercase block">5. Voice (Shabda)</label>
+                            <input
+                              type="text"
+                              value={examAshtaSthana.shabda || ''}
+                              onChange={(e) => setExamAshtaSthana({ ...examAshtaSthana, shabda: e.target.value })}
+                              placeholder="e.g. Clear & Resonant (Spashta)"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Phonation & vocal timbre</span>
+                          </div>
+
+                          {/* 6. Sparsha */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-blue-800 uppercase block">6. Skin (Sparsha)</label>
+                            <input
+                              type="text"
+                              value={examAshtaSthana.sparsha || ''}
+                              onChange={(e) => setExamAshtaSthana({ ...examAshtaSthana, sparsha: e.target.value })}
+                              placeholder="e.g. Warm & Mildly Dry (Ushna)"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Temperature & skin turgor</span>
+                          </div>
+
+                          {/* 7. Druk */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-blue-800 uppercase block">7. Eyes (Druk)</label>
+                            <input
+                              type="text"
+                              value={examAshtaSthana.druk || ''}
+                              onChange={(e) => setExamAshtaSthana({ ...examAshtaSthana, druk: e.target.value })}
+                              placeholder="e.g. Clear Sclera / Mild Injection"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Scleral color, pallor & icterus</span>
+                          </div>
+
+                          {/* 8. Akruti */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-blue-800 uppercase block">8. Facies (Akruti)</label>
+                            <input
+                              type="text"
+                              value={examAshtaSthana.akruti || ''}
+                              onChange={(e) => setExamAshtaSthana({ ...examAshtaSthana, akruti: e.target.value })}
+                              placeholder="e.g. Mild Pain Facies (Kastam)"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Posture, distress & habitus</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Part B: 10-Fold Systemic Constitution Assessment (Dashavidha) */}
+                      <div className="space-y-3 pt-3 border-t border-slate-200">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-md bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center">
+                            10
+                          </span>
+                          <h5 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                            Part B: 10-Fold Holistic Constitutional Assessment (Dashavidha Pariksha)
+                          </h5>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          {/* 1. Prakriti */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-emerald-800 uppercase block">1. Baseline Constitution (Prakriti)</label>
+                            <input
+                              type="text"
+                              value={examDashavidha.prakriti || ''}
+                              onChange={(e) => setExamDashavidha({ ...examDashavidha, prakriti: e.target.value })}
+                              placeholder="e.g. Vata-Pitta Combination"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-emerald-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Baseline genotype & doshic balance</span>
+                          </div>
+
+                          {/* 2. Vikriti */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-amber-800 uppercase block">2. Current Pathological State (Vikriti)</label>
+                            <input
+                              type="text"
+                              value={examDashavidha.vikriti || ''}
+                              onChange={(e) => setExamDashavidha({ ...examDashavidha, vikriti: e.target.value })}
+                              placeholder="e.g. Pitta Imbalance (Vidaha, Hyperacidity)"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-amber-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Current dosha morbidity deviation</span>
+                          </div>
+
+                          {/* 3. Sara */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-slate-700 uppercase block">3. Tissue Vitality & Reserve (Sara)</label>
+                            <input
+                              type="text"
+                              value={examDashavidha.sara || ''}
+                              onChange={(e) => setExamDashavidha({ ...examDashavidha, sara: e.target.value })}
+                              placeholder="e.g. Madhyama Reserve (Average tissue stamina)"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Dhatu tone & immunological robustness</span>
+                          </div>
+
+                          {/* 4. Samhanana */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-slate-700 uppercase block">4. Musculoskeletal Build (Samhanana)</label>
+                            <input
+                              type="text"
+                              value={examDashavidha.samhanana || ''}
+                              onChange={(e) => setExamDashavidha({ ...examDashavidha, samhanana: e.target.value })}
+                              placeholder="e.g. Compact & Robust (Samhanana Pravara)"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Skeletal symmetry & joint compactness</span>
+                          </div>
+
+                          {/* 5. Pramana */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-slate-700 uppercase block">5. Anthropometric Proportions (Pramana)</label>
+                            <input
+                              type="text"
+                              value={examDashavidha.pramana || ''}
+                              onChange={(e) => setExamDashavidha({ ...examDashavidha, pramana: e.target.value })}
+                              placeholder="e.g. Proportionate & Symmetrical (BMI in normal range)"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Limb proportions & body symmetry</span>
+                          </div>
+
+                          {/* 6. Satmya */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-slate-700 uppercase block">6. Adaptability & Habituation (Satmya)</label>
+                            <input
+                              type="text"
+                              value={examDashavidha.satmya || ''}
+                              onChange={(e) => setExamDashavidha({ ...examDashavidha, satmya: e.target.value })}
+                              placeholder="e.g. Moderate Adaptability (Sensitive to spicy foods)"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Tolerance to dietary changes & climate</span>
+                          </div>
+
+                          {/* 7. Sattva */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-purple-800 uppercase block">7. Mental Resilience (Sattva)</label>
+                            <input
+                              type="text"
+                              value={examDashavidha.sattva || ''}
+                              onChange={(e) => setExamDashavidha({ ...examDashavidha, sattva: e.target.value })}
+                              placeholder="e.g. Pravara Sattva (High fortitude) / Madhyama"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-purple-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Psychological coping & pain threshold</span>
+                          </div>
+
+                          {/* 8. Ahara-shakti */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-amber-800 uppercase block">8. Metabolic Power (Ahara-shakti / Agni)</label>
+                            <input
+                              type="text"
+                              value={examDashavidha.aharaShakti || ''}
+                              onChange={(e) => setExamDashavidha({ ...examDashavidha, aharaShakti: e.target.value })}
+                              placeholder="e.g. Tikshnagni / Samagni / Mandagni"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-amber-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Digestive fire & assimilation capacity</span>
+                          </div>
+
+                          {/* 9. Vyayama-shakti */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-slate-700 uppercase block">9. Physical Stamina (Vyayama-shakti)</label>
+                            <input
+                              type="text"
+                              value={examDashavidha.vyayamaShakti || ''}
+                              onChange={(e) => setExamDashavidha({ ...examDashavidha, vyayamaShakti: e.target.value })}
+                              placeholder="e.g. Moderate Endurance / Pravara"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Exertional endurance before fatigue</span>
+                          </div>
+
+                          {/* 10. Vaya */}
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+                            <label className="text-[10px] font-bold text-slate-700 uppercase block">10. Biological Age Stage (Vaya)</label>
+                            <input
+                              type="text"
+                              value={examDashavidha.vaya || ''}
+                              onChange={(e) => setExamDashavidha({ ...examDashavidha, vaya: e.target.value })}
+                              placeholder="e.g. Madhyama Phase (Adult Productive)"
+                              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 block">Developmental physiological phase</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bedside Exam Footer Actions */}
+                      <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-3">
+                        <span className="text-[11px] text-slate-500">
+                          Saving will update patient record and sync findings to cloud EHR.
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingIntegrativeExam(false)}
+                            className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveIntegrativeExam}
+                            className="px-4 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Save size={13} />
+                            <span>Save & Sign Bedside Examination</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Section 1: 10-Fold Holistic Constitutional Assessment (Dashavidha Pariksha) */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -2907,7 +3408,9 @@ export default function DoctorDashboard() {
                           <span className="text-[9px] font-mono bg-emerald-100/70 text-emerald-900 px-1.5 py-0.5 rounded font-bold">Genotype</span>
                         </div>
                         <span className="text-sm font-black text-emerald-950 block">
-                          {selectedPatient.dashavidha?.prakriti || selectedPatient.prakriti || 'Vata-Pitta Combination'}
+                          {selectedPatient.dashavidha?.prakriti || selectedPatient.prakriti || (
+                            <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
+                          )}
                         </span>
                         <p className="text-[11px] text-emerald-800 leading-relaxed">
                           Baseline psychosomatic constitution and biological doshic equilibrium.
@@ -2921,7 +3424,9 @@ export default function DoctorDashboard() {
                           <span className="text-[9px] font-mono bg-amber-100/70 text-amber-900 px-1.5 py-0.5 rounded font-bold">Morbidity</span>
                         </div>
                         <span className="text-sm font-black text-amber-950 block">
-                          {selectedPatient.dashavidha?.vikriti || 'Pitta Imbalance (Hyperacidity, Vidaha, Gastric distress)'}
+                          {selectedPatient.dashavidha?.vikriti || (
+                            <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
+                          )}
                         </span>
                         <p className="text-[11px] text-amber-800 leading-relaxed">
                           Current deviations from baseline dosha equilibrium causing clinical symptoms.
@@ -2935,7 +3440,9 @@ export default function DoctorDashboard() {
                           <span className="text-[9px] font-mono bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">Dhatu Tone</span>
                         </div>
                         <span className="text-sm font-black text-slate-900 block">
-                          {selectedPatient.dashavidha?.sara || 'Madhyama Reserve (Average tissue stamina)'}
+                          {selectedPatient.dashavidha?.sara || (
+                            <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
+                          )}
                         </span>
                         <p className="text-[11px] text-slate-500 leading-relaxed">
                           Integrity and immunological robustness of bodily tissue systems (Dhatus).
@@ -2949,7 +3456,9 @@ export default function DoctorDashboard() {
                           <span className="text-[9px] font-mono bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">Compactness</span>
                         </div>
                         <span className="text-sm font-black text-slate-900 block">
-                          {selectedPatient.dashavidha?.samhanana || 'Average Build (Balanced joint and skeletal tone)'}
+                          {selectedPatient.dashavidha?.samhanana || (
+                            <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
+                          )}
                         </span>
                         <p className="text-[11px] text-slate-500 leading-relaxed">
                           Skeletal symmetry, articular stability, and muscular firmness.
@@ -2963,7 +3472,9 @@ export default function DoctorDashboard() {
                           <span className="text-[9px] font-mono bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">Anthropometry</span>
                         </div>
                         <span className="text-sm font-black text-slate-900 block">
-                          {selectedPatient.dashavidha?.pramana || 'Proportionate & Symmetrical (BMI in normal range)'}
+                          {selectedPatient.dashavidha?.pramana || (
+                            <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
+                          )}
                         </span>
                         <p className="text-[11px] text-slate-500 leading-relaxed">
                           Structural bodily proportions, limb lengths, and anatomical symmetry.
@@ -2977,7 +3488,9 @@ export default function DoctorDashboard() {
                           <span className="text-[9px] font-mono bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">Tolerance</span>
                         </div>
                         <span className="text-sm font-black text-slate-900 block">
-                          {selectedPatient.dashavidha?.satmya || 'Moderate Adaptability (Sensitive to spicy foods & heat)'}
+                          {selectedPatient.dashavidha?.satmya || (
+                            <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
+                          )}
                         </span>
                         <p className="text-[11px] text-slate-500 leading-relaxed">
                           Habituation to diverse dietary items, weather extremes, and seasonal shifts.
@@ -2991,7 +3504,9 @@ export default function DoctorDashboard() {
                           <span className="text-[9px] font-mono bg-purple-100/70 text-purple-900 px-1.5 py-0.5 rounded font-bold">Psychological</span>
                         </div>
                         <span className="text-sm font-black text-purple-950 block">
-                          {selectedPatient.dashavidha?.sattva || 'Madhyama Resilience (Moderate coping, stress sensitive)'}
+                          {selectedPatient.dashavidha?.sattva || (
+                            <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
+                          )}
                         </span>
                         <p className="text-[11px] text-purple-800 leading-relaxed">
                           Psychological fortitude, pain tolerance, and emotional stability under stress.
@@ -3005,7 +3520,9 @@ export default function DoctorDashboard() {
                           <span className="text-[9px] font-mono bg-amber-100/70 text-amber-900 px-1.5 py-0.5 rounded font-bold">Metabolic</span>
                         </div>
                         <span className="text-sm font-black text-amber-950 block">
-                          {selectedPatient.dashavidha?.aharaShakti || selectedPatient.agni || 'Tikshnagni (Hyperacidic / Rapid hunger)'}
+                          {selectedPatient.dashavidha?.aharaShakti || selectedPatient.agni || (
+                            <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
+                          )}
                         </span>
                         <p className="text-[11px] text-amber-800 leading-relaxed">
                           Digestive fire strength (Abhyavaharana shakti) and post-prandial assimilation (Jarana shakti).
@@ -3019,7 +3536,9 @@ export default function DoctorDashboard() {
                           <span className="text-[9px] font-mono bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">Endurance</span>
                         </div>
                         <span className="text-sm font-black text-slate-900 block">
-                          {selectedPatient.dashavidha?.vyayamaShakti || 'Moderate Endurance (Handles routine work, tires on stairs)'}
+                          {selectedPatient.dashavidha?.vyayamaShakti || (
+                            <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
+                          )}
                         </span>
                         <p className="text-[11px] text-slate-500 leading-relaxed">
                           Functional aerobic capacity and muscular work tolerance before dyspnea/fatigue.
@@ -3033,7 +3552,9 @@ export default function DoctorDashboard() {
                           <span className="text-[9px] font-mono bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">Phase</span>
                         </div>
                         <span className="text-sm font-black text-slate-900 block">
-                          {selectedPatient.dashavidha?.vaya || `${selectedPatient.age} Yrs - Madhyama Phase (Adult Productive)`}
+                          {selectedPatient.dashavidha?.vaya || (selectedPatient.age ? `${selectedPatient.age} Yrs - Adult Phase` : (
+                            <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
+                          ))}
                         </span>
                         <p className="text-[11px] text-slate-500 leading-relaxed">
                           Physiological developmental phase influencing hormonal and metabolic balance.
@@ -3061,7 +3582,9 @@ export default function DoctorDashboard() {
                       <div className="p-3 bg-white rounded-xl border border-blue-200/90 shadow-2xs space-y-1">
                         <span className="text-[10px] font-bold text-blue-800 uppercase block">1. Pulse (Nadi)</span>
                         <span className="font-extrabold text-slate-900 block">
-                          {selectedPatient.ashtaSthana?.nadi || 'Rapid & Bounding (78 bpm)'}
+                          {selectedPatient.ashtaSthana?.nadi || (
+                            <span className="text-amber-700/80 font-normal italic text-xs">Bedside Exam Pending</span>
+                          )}
                         </span>
                         <span className="text-[10px] text-slate-500 block">Arterial rhythm & character</span>
                       </div>
@@ -3070,7 +3593,9 @@ export default function DoctorDashboard() {
                       <div className="p-3 bg-white rounded-xl border border-blue-200/90 shadow-2xs space-y-1">
                         <span className="text-[10px] font-bold text-blue-800 uppercase block">2. Urine (Mutra)</span>
                         <span className="font-extrabold text-slate-900 block">
-                          {selectedPatient.ashtaSthana?.mutra || 'Dark Yellow / Burning'}
+                          {selectedPatient.ashtaSthana?.mutra || (
+                            <span className="text-amber-700/80 font-normal italic text-xs">Bedside Exam Pending</span>
+                          )}
                         </span>
                         <span className="text-[10px] text-slate-500 block">Hydration & dysuria</span>
                       </div>
@@ -3079,7 +3604,9 @@ export default function DoctorDashboard() {
                       <div className="p-3 bg-white rounded-xl border border-blue-200/90 shadow-2xs space-y-1">
                         <span className="text-[10px] font-bold text-blue-800 uppercase block">3. Bowel (Mala / Koshtha)</span>
                         <span className="font-extrabold text-slate-900 block">
-                          {selectedPatient.ashtaSthana?.mala || selectedPatient.koshtha || 'Constipated & Hard (Krura)'}
+                          {selectedPatient.ashtaSthana?.mala || selectedPatient.koshtha || (
+                            <span className="text-amber-700/80 font-normal italic text-xs">Bedside Exam Pending</span>
+                          )}
                         </span>
                         <span className="text-[10px] text-slate-500 block">Stool consistency & regularity</span>
                       </div>
@@ -3088,7 +3615,9 @@ export default function DoctorDashboard() {
                       <div className="p-3 bg-white rounded-xl border border-blue-200/90 shadow-2xs space-y-1">
                         <span className="text-[10px] font-bold text-blue-800 uppercase block">4. Tongue (Jihwa)</span>
                         <span className="font-extrabold text-slate-900 block">
-                          {selectedPatient.ashtaSthana?.jihwa || 'Red Margins with White Fur'}
+                          {selectedPatient.ashtaSthana?.jihwa || (
+                            <span className="text-amber-700/80 font-normal italic text-xs">Bedside Exam Pending</span>
+                          )}
                         </span>
                         <span className="text-[10px] text-slate-500 block">Oral coating (Sama/Nirama)</span>
                       </div>
@@ -3097,7 +3626,9 @@ export default function DoctorDashboard() {
                       <div className="p-3 bg-white rounded-xl border border-blue-200/90 shadow-2xs space-y-1">
                         <span className="text-[10px] font-bold text-blue-800 uppercase block">5. Voice (Shabda)</span>
                         <span className="font-extrabold text-slate-900 block">
-                          {selectedPatient.ashtaSthana?.shabda || 'Clear & Resonant (Spashta)'}
+                          {selectedPatient.ashtaSthana?.shabda || (
+                            <span className="text-amber-700/80 font-normal italic text-xs">Bedside Exam Pending</span>
+                          )}
                         </span>
                         <span className="text-[10px] text-slate-500 block">Phonation & breath sounds</span>
                       </div>
@@ -3106,7 +3637,9 @@ export default function DoctorDashboard() {
                       <div className="p-3 bg-white rounded-xl border border-blue-200/90 shadow-2xs space-y-1">
                         <span className="text-[10px] font-bold text-blue-800 uppercase block">6. Skin (Sparsha)</span>
                         <span className="font-extrabold text-slate-900 block">
-                          {selectedPatient.ashtaSthana?.sparsha || 'Warm & Mildly Dry (Ushna)'}
+                          {selectedPatient.ashtaSthana?.sparsha || (
+                            <span className="text-amber-700/80 font-normal italic text-xs">Bedside Exam Pending</span>
+                          )}
                         </span>
                         <span className="text-[10px] text-slate-500 block">Temperature & palpatory turgor</span>
                       </div>
@@ -3115,7 +3648,9 @@ export default function DoctorDashboard() {
                       <div className="p-3 bg-white rounded-xl border border-blue-200/90 shadow-2xs space-y-1">
                         <span className="text-[10px] font-bold text-blue-800 uppercase block">7. Eyes (Druk)</span>
                         <span className="font-extrabold text-slate-900 block">
-                          {selectedPatient.ashtaSthana?.druk || 'Clear with Mild Vascular Redness'}
+                          {selectedPatient.ashtaSthana?.druk || (
+                            <span className="text-amber-700/80 font-normal italic text-xs">Bedside Exam Pending</span>
+                          )}
                         </span>
                         <span className="text-[10px] text-slate-500 block">Scleral & conjunctival color</span>
                       </div>
@@ -3124,21 +3659,23 @@ export default function DoctorDashboard() {
                       <div className="p-3 bg-white rounded-xl border border-blue-200/90 shadow-2xs space-y-1">
                         <span className="text-[10px] font-bold text-blue-800 uppercase block">8. Facies (Akruti)</span>
                         <span className="font-extrabold text-slate-900 block">
-                          {selectedPatient.ashtaSthana?.akruti || 'Mild Pain Facies (Kastam)'}
+                          {selectedPatient.ashtaSthana?.akruti || (
+                            <span className="text-amber-700/80 font-normal italic text-xs">Bedside Exam Pending</span>
+                          )}
                         </span>
                         <span className="text-[10px] text-slate-500 block">Posture, habitus & distress</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Section 3: Lifestyle & Diet Habits */}
+                  {/* Section 3: Lifestyle & Diet Habits (Patient-Reported Intake) */}
                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-700 block">Ahara & Vihara (Dietary Stressors & Daily Habits):</span>
-                      <span className="font-semibold text-slate-500">Sleep (Nidra): {selectedPatient.nidra || '6-7 hrs interrupted'}</span>
+                      <span className="font-bold text-slate-700 block">Ahara & Vihara (Reported Diet & Daily Habits):</span>
+                      <span className="font-semibold text-slate-500">Sleep (Nidra): {selectedPatient.nidra || 'Not specified'}</span>
                     </div>
                     <p className="text-slate-600 leading-relaxed">
-                      {selectedPatient.aharaVihara || 'Irregular breakfast, excessive tea consumption, late dinners'}
+                      {selectedPatient.aharaVihara || 'No specific dietary or lifestyle stressors entered during intake.'}
                     </p>
                   </div>
                 </div>

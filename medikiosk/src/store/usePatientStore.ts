@@ -216,6 +216,7 @@ interface PatientStore {
   evaluateTriageAndSummary: () => void;
   saveToDatabase: () => void;
   resetPatient: () => void;
+  resetDemoSession: () => void;
   loadPatient: (token: string) => PatientData | null;
   queueTrigger: number;
   triggerQueueUpdate: () => void;
@@ -739,67 +740,69 @@ export const mockDatabase: Record<string, PatientData> = {
   }
 };
 
+export const getFreshDemoProfile = (): PatientProfile => ({
+  abhaId: '88-3921-9941-0021',
+  name: 'Ramesh Kumar Sharma',
+  age: '58',
+  gender: 'Male',
+  phone: '9811223344',
+  height: '168',
+  weight: '76',
+  chronicConditions: [
+    { condition: 'Type 2 Diabetes Mellitus', duration: '8 years', medication: 'Tab Metformin 1000mg BD', status: 'Sub-optimally controlled', isDoctorVerified: true },
+    { condition: 'Essential Hypertension', duration: '5 years', medication: 'Tab Telmisartan 40mg OD', status: 'Poor compliance', isDoctorVerified: true },
+    { condition: 'Mild Joint Pain', duration: '6 months', medication: 'Paracetamol PRN', status: 'Self-reported', isDoctorVerified: false }
+  ],
+  allergies: [
+    { allergen: 'Penicillin', reaction: 'Anaphylaxis / Urticaria', severity: 'severe', isDoctorVerified: true },
+    { allergen: 'Dust', reaction: 'Sneezing', severity: 'mild', isDoctorVerified: false }
+  ],
+  uploadedDocuments: [
+    {
+      id: 'doc-1',
+      name: 'MaxLab_Lipid_HbA1c_July2024.pdf',
+      type: 'Lab Report',
+      date: '14 Jul 2024',
+      timestamp: new Date('2024-07-14T09:30:00').getTime(),
+      uploadedBy: 'patient',
+      isHandwritten: false,
+      ocrStatus: 'complete',
+      extractedDiagnoses: ['Hyperlipidemia', 'Poorly controlled Glycemia'],
+      extractedMeds: [],
+      extractedLabs: [
+        { test: 'HbA1c', value: '9.4', unit: '%', range: '4.0 - 5.6', isOutOfRange: true },
+        { test: 'Total Cholesterol', value: '248', unit: 'mg/dL', range: '< 200', isOutOfRange: true },
+        { test: 'Serum Creatinine', value: '1.4', unit: 'mg/dL', range: '0.7 - 1.2', isOutOfRange: true }
+      ],
+      notes: 'Digitally printed diagnostic panel from MaxLab Diagnostics. Extracted automatically with high optical confidence.'
+    }
+  ],
+  pastVisits: [
+    {
+      date: '10 Aug 2024',
+      hospital: 'City Hospital',
+      department: 'General Medicine',
+      reason: 'Routine checkup for BP, experiencing mild dizziness.',
+      diagnosis: 'Hypertensive crisis secondary to non-compliance',
+      prescriptions: ['Tab Telmisartan 40mg OD', 'Tab Amlodipine 5mg OD'],
+      patientVisibleNotes: 'Please take your BP medicines regularly. Cut down salt intake to less than 1 tsp per day. Follow up in 1 month with lipid profile.',
+      doctorNotesHidden: 'Patient non-compliant with Telmisartan. Re-emphasized diet control. Warned about cardiovascular risks.'
+    },
+    {
+      date: '15 Mar 2024',
+      hospital: 'AIIMS Delhi',
+      department: 'Endocrinology',
+      reason: 'High blood sugar readings at home.',
+      diagnosis: 'Uncontrolled Type 2 Diabetes',
+      prescriptions: ['Tab Metformin 1000mg BD', 'Tab Glimepiride 1mg OD'],
+      patientVisibleNotes: 'Continue strict diabetic diet. Avoid sweets and simple carbs. Start daily 30-minute brisk walk.',
+      doctorNotesHidden: 'HbA1c at 9.4%. Added sulfonylurea. Monitor for hypoglycemia.'
+    }
+  ]
+});
+
 export const mockProfiles: Record<string, PatientProfile> = {
-  '9811223344': {
-    abhaId: '88-3921-9941-0021',
-    name: 'Ramesh Kumar Sharma',
-    age: '58',
-    gender: 'Male',
-    phone: '9811223344',
-    height: '168',
-    weight: '76',
-    chronicConditions: [
-      { condition: 'Type 2 Diabetes Mellitus', duration: '8 years', medication: 'Tab Metformin 1000mg BD', status: 'Sub-optimally controlled', isDoctorVerified: true },
-      { condition: 'Essential Hypertension', duration: '5 years', medication: 'Tab Telmisartan 40mg OD', status: 'Poor compliance', isDoctorVerified: true },
-      { condition: 'Mild Joint Pain', duration: '6 months', medication: 'Paracetamol PRN', status: 'Self-reported', isDoctorVerified: false }
-    ],
-    allergies: [
-      { allergen: 'Penicillin', reaction: 'Anaphylaxis / Urticaria', severity: 'severe', isDoctorVerified: true },
-      { allergen: 'Dust', reaction: 'Sneezing', severity: 'mild', isDoctorVerified: false }
-    ],
-    uploadedDocuments: [
-      {
-        id: 'doc-1',
-        name: 'MaxLab_Lipid_HbA1c_July2024.pdf',
-        type: 'Lab Report',
-        date: '14 Jul 2024',
-        timestamp: new Date('2024-07-14T09:30:00').getTime(),
-        uploadedBy: 'patient',
-        isHandwritten: false,
-        ocrStatus: 'complete',
-        extractedDiagnoses: ['Hyperlipidemia', 'Poorly controlled Glycemia'],
-        extractedMeds: [],
-        extractedLabs: [
-          { test: 'HbA1c', value: '9.4', unit: '%', range: '4.0 - 5.6', isOutOfRange: true },
-          { test: 'Total Cholesterol', value: '248', unit: 'mg/dL', range: '< 200', isOutOfRange: true },
-          { test: 'Serum Creatinine', value: '1.4', unit: 'mg/dL', range: '0.7 - 1.2', isOutOfRange: true }
-        ],
-        notes: 'Digitally printed diagnostic panel from MaxLab Diagnostics. Extracted automatically with high optical confidence.'
-      }
-    ],
-    pastVisits: [
-      {
-        date: '10 Aug 2024',
-        hospital: 'City Hospital',
-        department: 'General Medicine',
-        reason: 'Routine checkup for BP, experiencing mild dizziness.',
-        diagnosis: 'Hypertensive crisis secondary to non-compliance',
-        prescriptions: ['Tab Telmisartan 40mg OD', 'Tab Amlodipine 5mg OD'],
-        patientVisibleNotes: 'Please take your BP medicines regularly. Cut down salt intake to less than 1 tsp per day. Follow up in 1 month with lipid profile.',
-        doctorNotesHidden: 'Patient non-compliant with Telmisartan. Re-emphasized diet control. Warned about cardiovascular risks.'
-      },
-      {
-        date: '15 Mar 2024',
-        hospital: 'AIIMS Delhi',
-        department: 'Endocrinology',
-        reason: 'High blood sugar readings at home.',
-        diagnosis: 'Uncontrolled Type 2 Diabetes',
-        prescriptions: ['Tab Metformin 1000mg BD', 'Tab Glimepiride 1mg OD'],
-        patientVisibleNotes: 'Continue strict diabetic diet. Avoid sweets and simple carbs. Start daily 30-minute brisk walk.',
-        doctorNotesHidden: 'HbA1c at 9.4%. Added sulfonylurea. Monitor for hypoglycemia.'
-      }
-    ]
-  }
+  '9811223344': getFreshDemoProfile()
 };
 
 export const usePatientStore = create<PatientStore>((set, get) => ({
@@ -827,20 +830,21 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
     const profile = Object.values(mockProfiles).find(p => p.phone === id || p.abhaId === id);
     if (profile) {
       set({ currentProfile: profile });
-      // pre-fill patient data with profile
-      set((state) => ({
+      // Pre-fill fresh patient intake session - never inherit stale consultation data from past runs
+      const freshIntake = createInitialPatient();
+      set({
         currentPatient: {
-          ...state.currentPatient,
+          ...freshIntake,
           name: profile.name,
           phone: profile.phone,
           age: profile.age,
           gender: profile.gender,
           abhaId: profile.abhaId,
-          chronicConditions: profile.chronicConditions,
-          allergies: profile.allergies,
-          uploadedDocuments: profile.uploadedDocuments,
+          chronicConditions: [...profile.chronicConditions],
+          allergies: [...profile.allergies],
+          uploadedDocuments: [...profile.uploadedDocuments],
         }
-      }));
+      });
     } else {
       // Create new profile with regData
       const newProfile: PatientProfile = {
@@ -861,21 +865,38 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
       mockProfiles[id] = newProfile;
       
       set({ currentProfile: newProfile });
-      set((state) => ({
+      const freshIntake = createInitialPatient();
+      set({
         currentPatient: {
-          ...state.currentPatient,
+          ...freshIntake,
           name: newProfile.name,
           phone: newProfile.phone,
           age: newProfile.age,
           gender: newProfile.gender,
           abhaId: newProfile.abhaId,
         }
-      }));
+      });
     }
   },
 
+  resetDemoSession: () => {
+    // Completely restore demo profile to pristine state and wipe active intake
+    mockProfiles['9811223344'] = getFreshDemoProfile();
+    set({
+      currentProfile: null,
+      currentPatient: createInitialPatient(),
+      queueTrigger: get().queueTrigger + 1
+    });
+  },
+
   logoutProfile: () => {
-    set({ currentProfile: null, currentPatient: createInitialPatient() });
+    // Reset session and restore baseline demo state for next demonstration
+    mockProfiles['9811223344'] = getFreshDemoProfile();
+    set({
+      currentProfile: null,
+      currentPatient: createInitialPatient(),
+      queueTrigger: get().queueTrigger + 1
+    });
   },
 
   setLanguage: (lang) =>

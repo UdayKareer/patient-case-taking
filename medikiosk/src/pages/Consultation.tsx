@@ -9,7 +9,8 @@ import {
   CheckCircle2,
   Leaf,
   Sparkles,
-  MapPin
+  MapPin,
+  Stethoscope
 } from 'lucide-react';
 import { usePatientStore } from '../store/usePatientStore';
 import {
@@ -74,30 +75,10 @@ export default function Consultation() {
   const [aharaVihara, setAharaVihara] = useState(currentPatient.aharaVihara || '');
   const [nidra, setNidra] = useState(currentPatient.nidra || '');
   const [dashavidha, setDashavidha] = useState<Partial<DashavidhaData>>(
-    currentPatient.dashavidha || {
-      prakriti: currentPatient.prakriti || 'Vata-Pitta',
-      vikriti: 'Pitta Imbalance (Hyperacidity, Vidaha)',
-      sara: 'Madhyama Reserve',
-      samhanana: 'Average Build',
-      pramana: 'Proportionate & Symmetrical',
-      satmya: 'Moderate Adaptability',
-      sattva: 'Moderate Resilience (Madhyama)',
-      aharaShakti: currentPatient.agni || 'Samagni (Optimal balanced digestion)',
-      vyayamaShakti: 'Moderate Endurance',
-      vaya: currentPatient.age && parseInt(currentPatient.age) > 60 ? 'Vriddha Phase (>60 Yrs)' : 'Madhyama Phase (Adult)'
-    }
+    currentPatient.dashavidha || {}
   );
   const [ashtaSthana, setAshtaSthana] = useState<Partial<AshtaSthanaData>>(
-    currentPatient.ashtaSthana || {
-      nadi: 'Normal Regular (70-80 bpm)',
-      mutra: 'Clear Pale Yellow',
-      mala: currentPatient.koshtha || 'Normal Formed',
-      jihwa: 'Clean & Pink (Nirama)',
-      shabda: 'Clear & Resonant (Spashta)',
-      sparsha: 'Smooth & Euthermic (Snigdha)',
-      druk: 'Clear & Lustrous',
-      akruti: 'Comfortable & Normal Facies'
-    }
+    currentPatient.ashtaSthana || {}
   );
   const [activeAyushQuestionId, setActiveAyushQuestionId] = useState<string>('q_gastro_start');
   const [ayushResponses, setAyushResponses] = useState<{ qId: string; answer: string; dosha: string }[]>(
@@ -1301,130 +1282,118 @@ export default function Consultation() {
           </div>
         )}
 
-        {/* STEP 4 (AYUSH & INTEGRATIVE): 10-Fold Dashavidha & 8-Point Ashta Sthana Clinical Profile */}
+        {/* STEP 4 (AYUSH): Pre-Consultation Patient Intake & Lifestyle Review */}
         {currentStep === 4 && isAyush && (
-          <div className="animate-slide-up space-y-6 max-w-2xl mx-auto text-left">
+          <div className="animate-slide-up space-y-5 max-w-2xl mx-auto text-left">
             <div className="text-center space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-1">
                 <Leaf size={13} />
-                <span>{isHindi ? 'दशविध व अष्टस्थान नैदानिक परीक्षा' : 'Dashavidha & Ashta Sthana Clinical Matrix'}</span>
+                <span>{isHindi ? 'परामर्श-पूर्व रोगी समीक्षा' : 'Pre-Consultation Patient Intake Review'}</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                {isHindi ? 'एकीकृत स्वास्थ्य व शारीरिक परीक्षण सारांश' : 'Integrative Holistic Clinical Summary'}
+                {isHindi ? 'आपकी जीवनशैली व स्वास्थ्य विवरण सारांश' : 'Your Self-Reported Clinical & Lifestyle Summary'}
               </h2>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 {isHindi
-                  ? 'रोग की जड़ समझने के लिए 10-आयामी समग्र स्वास्थ्य और 8-बिंदु प्रत्यक्ष परीक्षण तैयार है।'
-                  : 'Standardized 10-fold systemic vitality profiling and 8-point physical bedside markers.'}
+                  ? 'आपके द्वारा दर्ज किए गए लक्षण, पाचन, आहार-विहार व प्राथमिक प्रकृति का विवरण।'
+                  : 'Review your symptoms, digestive fire, lifestyle habits, and preliminary constitutional tendencies.'}
               </p>
             </div>
 
-            {/* 1. Dashavidha Pariksha (10-Fold Systemic Vitality & Constitution) */}
-            <div className="bg-white rounded-2xl p-5 border border-emerald-200/90 shadow-xs space-y-3">
-              <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+            {/* Self-Reported Intake Summary Card */}
+            <div className="bg-white rounded-2xl p-5 border border-emerald-200/90 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-emerald-100 pb-2.5">
                 <div className="flex items-center gap-2">
                   <Sparkles size={16} className="text-emerald-600" />
                   <h3 className="text-xs font-black uppercase tracking-wider text-emerald-950">
-                    {isHindi ? '1. दशविध समग्र स्वास्थ्य परीक्षण (10-Fold Holistic Profile)' : '1. 10-Fold Holistic Health Profile (Dashavidha)'}
+                    {isHindi ? 'रोगी द्वारा दर्ज स्वास्थ्य विवरण' : 'Patient Self-Reported Intake Data'}
                   </h3>
                 </div>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  AYUSH PS 26047
+                  {isHindi ? 'सत्यापित' : 'Patient Entered'}
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Constitution / Prakriti</span>
-                  <span className="font-bold text-slate-900">{dashavidha.prakriti || prakriti || 'Vata-Pitta'}</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">
+                    {isHindi ? 'मुख्य लक्षण' : 'Chief Complaint'}
+                  </span>
+                  <span className="font-bold text-slate-900 text-sm block">
+                    {chiefComplaintText || currentPatient.chiefComplaint || 'Consultation'}
+                  </span>
+                  {duration && (
+                    <span className="text-[11px] text-slate-500 mt-1 block">
+                      {isHindi ? `अवधि: ${duration}` : `Duration: ${duration}`}
+                    </span>
+                  )}
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Current Morbidity / Vikriti</span>
-                  <span className="font-bold text-slate-900">{dashavidha.vikriti || 'Pitta Imbalance (Hyperacidity/Vidaha)'}</span>
+
+                <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-200/80">
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase block mb-0.5">
+                    {isHindi ? 'प्राथमिक दोष प्रवृत्ति (अनुमानित)' : 'Estimated Prakriti Tendency'}
+                  </span>
+                  <span className="font-bold text-emerald-950 text-sm block">
+                    {prakriti || 'Vata-Pitta'}
+                  </span>
+                  <span className="text-[11px] text-emerald-700 mt-1 block">
+                    {isHindi ? 'प्रश्नावली के आधार पर प्रारंभिक अनुमान' : 'Derived from self-reported intake responses'}
+                  </span>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Tissue Vitality / Sara</span>
-                  <span className="font-bold text-slate-900">{dashavidha.sara || 'Madhyama (Moderate Reserve)'}</span>
+
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">
+                    {isHindi ? 'भूख व पाचन क्षमता (अग्नि)' : 'Reported Digestion & Appetite (Agni)'}
+                  </span>
+                  <span className="font-bold text-slate-800 block">
+                    {agni || 'Samagni (Balanced digestion)'}
+                  </span>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Skeletal Build / Samhanana</span>
-                  <span className="font-bold text-slate-900">{dashavidha.samhanana || 'Average Build (Balanced tone)'}</span>
+
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">
+                    {isHindi ? 'शौच प्रवृत्ति (कोष्ठ)' : 'Bowel Regularity (Koshtha)'}
+                  </span>
+                  <span className="font-bold text-slate-800 block">
+                    {koshtha || 'Normal Regular Formed'}
+                  </span>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Body Proportions / Pramana</span>
-                  <span className="font-bold text-slate-900">{dashavidha.pramana || 'Proportionate & Symmetrical'}</span>
+
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">
+                    {isHindi ? 'आहार-विहार' : 'Reported Diet & Lifestyle (Ahara-Vihara)'}
+                  </span>
+                  <span className="font-bold text-slate-800 block">
+                    {aharaVihara || 'Light vegetarian diet, timely meals'}
+                  </span>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Diet Adaptability / Satmya</span>
-                  <span className="font-bold text-slate-900">{dashavidha.satmya || 'Moderate Adaptability'}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Mental Resilience / Sattva</span>
-                  <span className="font-bold text-slate-900">{dashavidha.sattva || 'Moderate Resilience (Madhyama)'}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Digestive Capacity / Agni</span>
-                  <span className="font-bold text-slate-900">{dashavidha.aharaShakti || agni || 'Samagni (Balanced)'}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Physical Endurance / Vyayama</span>
-                  <span className="font-bold text-slate-900">{dashavidha.vyayamaShakti || 'Moderate Endurance'}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Biological Phase / Vaya</span>
-                  <span className="font-bold text-slate-900">{dashavidha.vaya || 'Madhyama Phase (Adult)'}</span>
+
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">
+                    {isHindi ? 'निद्रा' : 'Reported Sleep Quality (Nidra)'}
+                  </span>
+                  <span className="font-bold text-slate-800 block">
+                    {nidra || 'Sound, peaceful sleep'}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* 2. Ashta Sthana Pariksha (8-Point Bedside Clinical Matrix) */}
-            <div className="bg-white rounded-2xl p-5 border border-blue-200/90 shadow-xs space-y-3">
-              <div className="flex items-center justify-between border-b border-blue-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={16} className="text-blue-600" />
-                  <h3 className="text-xs font-black uppercase tracking-wider text-blue-950">
-                    {isHindi ? '2. अष्टस्थान प्रत्यक्ष परीक्षा (8-Point Bedside Matrix)' : '2. 8-Point Bedside Clinical Matrix (Ashta Sthana)'}
-                  </h3>
-                </div>
-                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                  Clinical Examination
+            {/* Clear Physical Examination Clinical Notice */}
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-2">
+              <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
+                <Stethoscope size={18} className="text-amber-700 shrink-0" />
+                <span>
+                  {isHindi
+                    ? 'चिकित्सकीय शारीरिक परीक्षा (ओपीडी कक्ष में)'
+                    : 'Physical Clinical Examination Conducted in OPD Room'}
                 </span>
               </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Pulse (Nadi)</span>
-                  <span className="font-bold text-slate-800 line-clamp-1">{ashtaSthana.nadi || 'Normal (72 bpm)'}</span>
-                </div>
-                <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Urine (Mutra)</span>
-                  <span className="font-bold text-slate-800 line-clamp-1">{ashtaSthana.mutra || 'Clear Pale Yellow'}</span>
-                </div>
-                <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Bowel (Mala)</span>
-                  <span className="font-bold text-slate-800 line-clamp-1">{ashtaSthana.mala || koshtha || 'Normal Formed'}</span>
-                </div>
-                <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Tongue (Jihwa)</span>
-                  <span className="font-bold text-slate-800 line-clamp-1">{ashtaSthana.jihwa || 'Clean & Pink'}</span>
-                </div>
-                <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Voice (Shabda)</span>
-                  <span className="font-bold text-slate-800 line-clamp-1">{ashtaSthana.shabda || 'Clear & Resonant'}</span>
-                </div>
-                <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Skin (Sparsha)</span>
-                  <span className="font-bold text-slate-800 line-clamp-1">{ashtaSthana.sparsha || 'Smooth & Normal'}</span>
-                </div>
-                <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Eyes (Druk)</span>
-                  <span className="font-bold text-slate-800 line-clamp-1">{ashtaSthana.druk || 'Clear & Lustrous'}</span>
-                </div>
-                <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Facies (Akruti)</span>
-                  <span className="font-bold text-slate-800 line-clamp-1">{ashtaSthana.akruti || 'Comfortable Normal'}</span>
-                </div>
-              </div>
+              <p className="text-amber-800 leading-relaxed font-medium">
+                {isHindi
+                  ? 'ध्यान दें: दशविध समग्र शारीरिक परीक्षण (धातु-सार, संहनन, सात्म्य) और अष्टस्थान प्रत्यक्ष परीक्षा (नाड़ी परीक्षा/Pulse, जिह्वा/Tongue, नेत्र, त्वचा आदि) ओपीडी कक्ष में उपस्थित होने पर डॉक्टर अथवा नर्सिंग स्टाफ द्वारा प्रत्यक्ष रूप से की जाएगी।'
+                  : 'Notice: Formal 10-Fold Systemic Examination (Dashavidha Pariksha: tissue vitality, structural build, adaptability) and 8-Point Physical Examination (Ashta Sthana: arterial pulse rhythm / Nadi, tongue inspection / Jihwa, skin texture, sclera) will be physically conducted and documented by your attending physician / nurse in OPD Room 14.'}
+              </p>
             </div>
           </div>
         )}
