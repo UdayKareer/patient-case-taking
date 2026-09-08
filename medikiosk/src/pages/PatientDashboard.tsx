@@ -136,42 +136,70 @@ export default function PatientDashboard() {
           const rawResult = reader.result as string;
           const base64Data = rawResult.includes(',') ? rawResult.split(',')[1] : rawResult;
 
-          const response = await fetch('/api/ocr', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileBase64: base64Data,
-              mimeType: file.type || 'image/jpeg'
-            }),
-          });
+          let ocrResultData: any = null;
+          let ocrSuccess = false;
 
-          const result = await response.json();
-          
-          if (response.ok && result.success) {
-            updateProfile({
-              uploadedDocuments: [
-                ...currentProfile.uploadedDocuments,
-                {
-                  id: 'doc-' + Date.now(),
-                  name: file.name,
-                  type: file.type.includes('pdf') ? 'Lab Report' : 'Prescription',
-                  date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-                  extractedDiagnoses: result.data?.diagnoses || [],
-                  extractedMeds: (result.data?.prescriptions || []).map((p: any) => ({
-                    name: p.medicineName,
-                    dose: p.dosage,
-                    frequency: p.frequency
-                  })),
-                  extractedLabs: []
-                }
-              ]
+          try {
+            const response = await fetch('/api/ocr', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fileBase64: base64Data,
+                mimeType: file.type || 'image/jpeg'
+              }),
             });
-          } else {
-            setUploadError(result.error || 'Failed to process document');
+
+            if (response.ok) {
+              const result = await response.json();
+              if (result.success && result.data) {
+                ocrResultData = result.data;
+                ocrSuccess = true;
+              }
+            }
+          } catch (ocrErr) {
+            console.warn('OCR processing unavailable or document contains handwritten cursive. Bypassing raw scan directly to doctor verification viewer:', ocrErr);
           }
+
+          const docType = file.type.includes('pdf') ? 'Lab Report' : 'Prescription';
+          const isHandwrittenDoc = !ocrSuccess || (
+            (!ocrResultData?.prescriptions || ocrResultData.prescriptions.length === 0) &&
+            (!ocrResultData?.diagnoses || ocrResultData.diagnoses.length === 0)
+          );
+
+          // Always add document with fileUrl preserved so doctor can inspect the original scan!
+          updateProfile({
+            uploadedDocuments: [
+              ...currentProfile.uploadedDocuments,
+              {
+                id: 'doc-' + Date.now(),
+                name: file.name,
+                type: docType,
+                date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                fileUrl: rawResult,
+                isHandwritten: isHandwrittenDoc,
+                ocrStatus: ocrSuccess ? 'complete' : 'bypassed_to_doctor',
+                extractedDiagnoses: ocrResultData?.diagnoses || [],
+                extractedMeds: (ocrResultData?.prescriptions || []).map((p: any) => ({
+                  name: p.medicineName,
+                  dose: p.dosage,
+                  frequency: p.frequency
+                })),
+                extractedLabs: (ocrResultData?.labResults || []).map((l: any) => ({
+                  test: l.testName || l.test || 'Lab Test',
+                  value: String(l.value ?? ''),
+                  unit: l.unit || '',
+                  range: l.range || '',
+                  isOutOfRange: Boolean(l.isOutOfRange)
+                })),
+                notes: !ocrSuccess
+                  ? 'Handwritten or cursive document bypassed directly to Doctor verification viewer for visual clinical safety.'
+                  : 'Digitally extracted and structured.'
+              }
+            ]
+          });
         } catch (innerErr) {
           console.error(innerErr);
-          setUploadError('Failed to parse AI response.');
+          setUploadError('Failed to parse document. Please try again.');
         } finally {
           setIsUploadingDoc(false);
           if (fileInputRef.current) fileInputRef.current.value = '';
@@ -877,10 +905,17 @@ export default function PatientDashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[10px] font-medium rounded-md flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        Indexed & Structured
-                      </span>
+                      {doc.ocrStatus === 'bypassed_to_doctor' ? (
+                        <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/70 text-[10px] font-medium rounded-md flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                          Raw Scan Sent to Doctor
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[10px] font-medium rounded-md flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          Indexed & Structured
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}

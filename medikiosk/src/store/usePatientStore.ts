@@ -54,6 +54,10 @@ export interface UploadedDocument {
   extractedDiagnoses: string[];
   extractedMeds: DocumentMedication[];
   extractedLabs: DocumentLabResult[];
+  fileUrl?: string;
+  isHandwritten?: boolean;
+  ocrStatus?: 'complete' | 'bypassed_to_doctor' | 'partial';
+  notes?: string;
 }
 
 export interface ChronicConditionItem {
@@ -349,13 +353,16 @@ export const mockDatabase: Record<string, PatientData> = {
         name: 'MaxLab_Lipid_HbA1c_July2024.pdf',
         type: 'Lab Report',
         date: '14 Jul 2024',
+        isHandwritten: false,
+        ocrStatus: 'complete',
         extractedDiagnoses: ['Hyperlipidemia', 'Poorly controlled Glycemia'],
         extractedMeds: [],
         extractedLabs: [
           { test: 'HbA1c', value: '9.4', unit: '%', range: '4.0 - 5.6', isOutOfRange: true },
           { test: 'Total Cholesterol', value: '248', unit: 'mg/dL', range: '< 200', isOutOfRange: true },
           { test: 'Serum Creatinine', value: '1.4', unit: 'mg/dL', range: '0.7 - 1.2', isOutOfRange: true }
-        ]
+        ],
+        notes: 'Digitally printed diagnostic panel from MaxLab Diagnostics. Extracted automatically with high optical confidence.'
       }
     ],
     consentHistory: true,
@@ -450,6 +457,8 @@ export const mockDatabase: Record<string, PatientData> = {
         name: 'Prescription_CivilHospital_April.jpg',
         type: 'Prescription',
         date: '22 Apr 2024',
+        isHandwritten: true,
+        ocrStatus: 'bypassed_to_doctor',
         extractedDiagnoses: ['Acid Peptic Disease', 'Early Bilateral Knee OA'],
         extractedMeds: [
           { name: 'Pantoprazole 40mg', dose: '1 tab', frequency: 'Before breakfast' },
@@ -458,7 +467,8 @@ export const mockDatabase: Record<string, PatientData> = {
         extractedLabs: [
           { test: 'Serum Uric Acid', value: '5.2', unit: 'mg/dL', range: '2.5 - 6.5', isOutOfRange: false },
           { test: 'ESR', value: '24', unit: 'mm/hr', range: '0 - 20', isOutOfRange: true }
-        ]
+        ],
+        notes: 'Handwritten OPD prescription slip from Civil Hospital. Partially illegible cursive notation bypassed directly to doctor verification viewer for bedside clinical safety.'
       }
     ],
     consentHistory: true,
@@ -691,13 +701,16 @@ export const mockProfiles: Record<string, PatientProfile> = {
         name: 'MaxLab_Lipid_HbA1c_July2024.pdf',
         type: 'Lab Report',
         date: '14 Jul 2024',
+        isHandwritten: false,
+        ocrStatus: 'complete',
         extractedDiagnoses: ['Hyperlipidemia', 'Poorly controlled Glycemia'],
         extractedMeds: [],
         extractedLabs: [
           { test: 'HbA1c', value: '9.4', unit: '%', range: '4.0 - 5.6', isOutOfRange: true },
           { test: 'Total Cholesterol', value: '248', unit: 'mg/dL', range: '< 200', isOutOfRange: true },
           { test: 'Serum Creatinine', value: '1.4', unit: 'mg/dL', range: '0.7 - 1.2', isOutOfRange: true }
-        ]
+        ],
+        notes: 'Digitally printed diagnostic panel from MaxLab Diagnostics. Extracted automatically with high optical confidence.'
       }
     ],
     pastVisits: [

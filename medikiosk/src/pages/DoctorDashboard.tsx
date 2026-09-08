@@ -21,11 +21,13 @@ import {
   Building2,
   Activity,
   Clock,
-  Stethoscope
+  Stethoscope,
+  Eye
 } from 'lucide-react';
-import { usePatientStore, mockDatabase, mockProfiles, type PatientData, type IpdMedication, type IpdProgressNote, syncPatientToSupabase } from '../store/usePatientStore';
+import { usePatientStore, mockDatabase, mockProfiles, type PatientData, type IpdMedication, type IpdProgressNote, type UploadedDocument, syncPatientToSupabase } from '../store/usePatientStore';
 import type { DoctorOutletContext } from '../components/DoctorLayout';
 import OPDPrescriptionModal from '../components/OPDPrescriptionModal';
+import DocumentViewerModal from '../components/DocumentViewerModal';
 import { getEsiMetadata, calculateRuleBasedEsi, type EsiTriageResult } from '../services/clinicalAiService';
 
 interface PrescribedMedItem {
@@ -127,6 +129,7 @@ export default function DoctorDashboard() {
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [queueFilter, setQueueFilter] = useState<'all' | 'emergency' | 'ayush' | 'waiting' | 'relieved'>('all');
   const [sortBy, setSortBy] = useState<'longest_wait' | 'newest' | 'acuity'>('longest_wait');
+  const [viewingDoc, setViewingDoc] = useState<UploadedDocument | null>(null);
 
   // Feature 4D: Automated Emergency Severity Index (ESI) Triage State
   const [showEsiOverride, setShowEsiOverride] = useState(false);
@@ -1738,14 +1741,51 @@ export default function DoctorDashboard() {
                     {selectedPatient.uploadedDocuments && selectedPatient.uploadedDocuments.length > 0 ? (
                       <div className="space-y-3">
                         {selectedPatient.uploadedDocuments.map((doc) => (
-                          <div key={doc.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                            <div className="flex items-center justify-between text-xs mb-2">
-                              <span className="font-bold text-slate-900">{doc.name}</span>
-                              <span className="text-slate-500 font-mono">{doc.date}</span>
+                          <div key={doc.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-900">{doc.name}</span>
+                                {doc.isHandwritten && (
+                                  <span className="text-[10px] font-semibold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">
+                                    Handwritten Scan
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-slate-500 font-mono text-[11px]">{doc.date}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingDoc(doc)}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-blue-700 bg-white hover:bg-blue-50 border border-blue-200 rounded-lg transition-colors shadow-xs cursor-pointer"
+                                  title="View original scanned prescription/report image"
+                                >
+                                  <Eye size={12} className="text-blue-600" />
+                                  <span>View Original Scan</span>
+                                </button>
+                              </div>
                             </div>
 
+                            {/* If bypassed / handwritten notice when neither labs nor meds were digitizable */}
+                            {(!doc.extractedLabs || doc.extractedLabs.length === 0) && (!doc.extractedMeds || doc.extractedMeds.length === 0) && (
+                              <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-lg text-xs text-amber-900 flex items-center justify-between">
+                                <span className="text-[11px]">
+                                  {doc.isHandwritten
+                                    ? 'Cursive handwriting bypassed directly to doctor inspection for bedside safety.'
+                                    : 'Original scanned document available for verification.'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingDoc(doc)}
+                                  className="text-[11px] font-bold text-amber-900 underline hover:text-amber-950 flex items-center gap-1"
+                                >
+                                  Open Lightbox &rarr;
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Extracted Labs if present */}
                             {doc.extractedLabs && doc.extractedLabs.length > 0 && (
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {doc.extractedLabs.map((lab, i) => (
                                   <div
                                     key={i}
@@ -1767,6 +1807,23 @@ export default function DoctorDashboard() {
                                     <div className="text-[10px] text-slate-500">Normal: {lab.range}</div>
                                   </div>
                                 ))}
+                              </div>
+                            )}
+
+                            {/* Extracted Medications if present */}
+                            {doc.extractedMeds && doc.extractedMeds.length > 0 && (
+                              <div className="pt-1 border-t border-slate-200/60">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                  Prior Scanned Medications
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {doc.extractedMeds.map((med, i) => (
+                                    <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] text-slate-800">
+                                      <span className="font-bold">{med.name}</span>
+                                      <span className="text-slate-500 font-mono text-[10px]">({med.dose} • {med.frequency})</span>
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -2139,37 +2196,184 @@ export default function DoctorDashboard() {
 
               {/* Tab Content 2: OCR Document Scans */}
               {activeChartTab === 'ocr' && (
-                <div className="p-6 space-y-4">
-                  <h3 className="text-sm font-bold text-slate-900">Scanned Historical Prescriptions & Lab Records</h3>
-                  
-                  
-                  {selectedPatient.uploadedDocuments.map((doc) => (
-                    <div key={doc.id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-slate-900">{doc.name}</span>
-                        <span className="text-xs font-mono text-slate-500 bg-white px-2 py-0.5 rounded border">
-                          {doc.date}
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-600">
-                        <strong>Diagnoses Detected: </strong> {doc.extractedDiagnoses.join(', ') || 'General Review'}
-                      </div>
-                      {doc.extractedLabs.length > 0 && (
-                        <div className="space-y-1.5">
-                          <span className="text-xs font-bold text-slate-700">Digitized Lab Parameters:</span>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            {doc.extractedLabs.map((l, idx) => (
-                              <div key={idx} className="p-2 bg-white rounded-lg border text-xs">
-                                <div className="font-semibold text-slate-700">{l.test}</div>
-                                <div className="text-sm font-black">{l.value} {l.unit}</div>
-                                <div className="text-[10px] text-slate-400">Normal Range: {l.range}</div>
+                <div className="p-6 space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
+                        Scanned Prescriptions & Lab Documents ({selectedPatient.uploadedDocuments?.length || 0})
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        ABDM optical ingestion pipeline with raw document bypass for handwritten cursive clinical slips.
+                      </p>
+                    </div>
+                  </div>
+
+                  {!selectedPatient.uploadedDocuments || selectedPatient.uploadedDocuments.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                      <FileText size={32} className="mx-auto text-slate-400" />
+                      <h4 className="text-sm font-bold text-slate-700">No Scanned Documents Uploaded</h4>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                        Documents uploaded by the patient at the Kiosk or via their Mobile Dashboard will be displayed here with side-by-side verification lightboxes.
+                      </p>
+                    </div>
+                  ) : (
+                    selectedPatient.uploadedDocuments.map((doc) => (
+                      <div key={doc.id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50/80 space-y-4 shadow-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                              <FileText size={16} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm text-slate-900">{doc.name}</span>
+                                <span className="text-[10px] font-semibold bg-slate-200 text-slate-700 px-2 py-0.5 rounded">
+                                  {doc.type}
+                                </span>
                               </div>
-                            ))}
+                              <span className="text-xs font-mono text-slate-500">{doc.date}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {doc.ocrStatus === 'bypassed_to_doctor' || doc.isHandwritten ? (
+                              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-md flex items-center gap-1">
+                                <AlertTriangle size={12} className="text-amber-600" />
+                                Handwritten / Bypassed to Doctor
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-md flex items-center gap-1">
+                                <ShieldCheck size={12} className="text-emerald-600" />
+                                Digitized & Indexed
+                              </span>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => setViewingDoc(doc)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer"
+                            >
+                              <Eye size={14} />
+                              <span>View Original Scanned Document</span>
+                            </button>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
+
+                        {doc.notes && (
+                          <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2 leading-relaxed">
+                            <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <strong className="font-semibold">Clinical Transcription Note: </strong>
+                              {doc.notes}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="text-xs text-slate-700">
+                          <strong className="font-semibold text-slate-900">Extracted Diagnoses: </strong>{' '}
+                          {doc.extractedDiagnoses && doc.extractedDiagnoses.length > 0 ? (
+                            <span className="inline-flex flex-wrap gap-1 mt-1">
+                              {doc.extractedDiagnoses.map((d, i) => (
+                                <span key={i} className="px-2 py-0.5 bg-white border border-slate-200 rounded font-medium text-slate-800">
+                                  {d}
+                                </span>
+                              ))}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 italic">None structured (manual visual review advised)</span>
+                          )}
+                        </div>
+
+                        {/* Extracted Medications with 1-Click Import to Rx Pad */}
+                        {doc.extractedMeds && doc.extractedMeds.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                              <span>Digitized Medications on this Slip:</span>
+                              <span className="text-[10px] text-slate-500 font-normal">Click "+ Add to Rx Pad" to prescribe</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {doc.extractedMeds.map((med, mIdx) => (
+                                <div key={mIdx} className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-2 text-xs">
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-slate-900 truncate">{med.name}</div>
+                                    <div className="text-[11px] text-slate-500 font-mono">
+                                      {med.dose} • {med.frequency}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPrescribedMeds((prev) => [
+                                        ...prev,
+                                        {
+                                          name: med.name,
+                                          dose: med.dose || '1 Dose',
+                                          frequency: med.frequency || '1-0-1',
+                                          duration: '7 Days',
+                                          instructions: 'As noted on previous scanned prescription'
+                                        }
+                                      ]);
+                                      setStatusMessage(`Added "${med.name}" to prescription pad.`);
+                                      setTimeout(() => setStatusMessage(''), 3000);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors shrink-0"
+                                  >
+                                    <Plus size={12} /> Add to Rx
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Digitized Labs */}
+                        {doc.extractedLabs && doc.extractedLabs.length > 0 && (
+                          <div className="space-y-2">
+                            <span className="text-xs font-bold text-slate-800">Digitized Lab Parameters:</span>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {doc.extractedLabs.map((l, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`p-2.5 rounded-xl border text-xs ${
+                                    l.isOutOfRange
+                                      ? 'bg-red-50 border-red-200 text-red-900'
+                                      : 'bg-white border-slate-200 text-slate-800'
+                                  }`}
+                                >
+                                  <div className="font-semibold text-slate-700">{l.test}</div>
+                                  <div className="text-sm font-black mt-0.5">
+                                    {l.value} {l.unit}
+                                    {l.isOutOfRange && (
+                                      <span className="ml-1.5 text-[9px] uppercase font-bold text-red-600 bg-red-100 px-1 py-0.5 rounded">
+                                        Abnormal
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 mt-0.5">Normal Range: {l.range}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Lightbox Quick Access Callout */}
+                        <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 flex items-center justify-between text-xs text-blue-900">
+                          <span className="text-[11px]">
+                            {doc.isHandwritten
+                              ? '⚠️ Cursive clinical handwriting detected. Visual inspection in verification lightbox is advised.'
+                              : '🔍 Need high-resolution bedside inspection? Zoom into the raw clinical scan.'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setViewingDoc(doc)}
+                            className="text-xs font-bold text-blue-700 underline hover:text-blue-900 flex items-center gap-1 shrink-0 ml-2"
+                          >
+                            Open Verification Lightbox &rarr;
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
 
@@ -2318,6 +2522,26 @@ export default function DoctorDashboard() {
           doctorNotes={doctorNotes}
           prescribedMeds={prescribedMeds}
           onClose={() => setShowPrescriptionModal(false)}
+        />
+      )}
+
+      {/* Document Inspection & Verification Lightbox Modal */}
+      {viewingDoc && (
+        <DocumentViewerModal
+          document={viewingDoc}
+          patientName={selectedPatient.name}
+          patientToken={selectedPatient.token}
+          onClose={() => setViewingDoc(null)}
+          onAddPrescription={(med) => {
+            setPrescribedMeds((prev) => [...prev, med]);
+            setStatusMessage(`Added "${med.name}" to active prescription pad.`);
+            setTimeout(() => setStatusMessage(''), 3000);
+          }}
+          onAppendNotes={(note) => {
+            setDoctorNotes((prev) => (prev ? `${prev}\n${note}` : note));
+            setStatusMessage('Appended transcription note to doctor observations.');
+            setTimeout(() => setStatusMessage(''), 3000);
+          }}
         />
       )}
 
