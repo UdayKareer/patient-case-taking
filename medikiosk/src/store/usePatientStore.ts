@@ -49,8 +49,10 @@ export interface DocumentMedication {
 export interface UploadedDocument {
   id: string;
   name: string;
-  type: 'Prescription' | 'Lab Report' | 'Discharge Summary';
+  type: 'Prescription' | 'Lab Report' | 'Discharge Summary' | 'ECG / Radiology' | 'Bedside Scan';
   date: string;
+  timestamp?: number;
+  uploadedBy?: 'doctor' | 'patient' | 'system';
   extractedDiagnoses: string[];
   extractedMeds: DocumentMedication[];
   extractedLabs: DocumentLabResult[];
@@ -202,6 +204,7 @@ interface PatientStore {
   setLanguage: (lang: 'en' | 'hi') => void;
   setMode: (mode: 'modern' | 'ayush') => void;
   addDocument: (doc: UploadedDocument) => void;
+  addDocumentToPatient: (patientToken: string, doc: UploadedDocument) => void;
   removeDocument: (id: string) => void;
   generatePatientToken: () => string;
   evaluateTriageAndSummary: () => void;
@@ -353,6 +356,8 @@ export const mockDatabase: Record<string, PatientData> = {
         name: 'MaxLab_Lipid_HbA1c_July2024.pdf',
         type: 'Lab Report',
         date: '14 Jul 2024',
+        timestamp: new Date('2024-07-14T09:30:00').getTime(),
+        uploadedBy: 'patient',
         isHandwritten: false,
         ocrStatus: 'complete',
         extractedDiagnoses: ['Hyperlipidemia', 'Poorly controlled Glycemia'],
@@ -457,6 +462,8 @@ export const mockDatabase: Record<string, PatientData> = {
         name: 'Prescription_CivilHospital_April.jpg',
         type: 'Prescription',
         date: '22 Apr 2024',
+        timestamp: new Date('2024-04-22T11:15:00').getTime(),
+        uploadedBy: 'patient',
         isHandwritten: true,
         ocrStatus: 'bypassed_to_doctor',
         extractedDiagnoses: ['Acid Peptic Disease', 'Early Bilateral Knee OA'],
@@ -701,6 +708,8 @@ export const mockProfiles: Record<string, PatientProfile> = {
         name: 'MaxLab_Lipid_HbA1c_July2024.pdf',
         type: 'Lab Report',
         date: '14 Jul 2024',
+        timestamp: new Date('2024-07-14T09:30:00').getTime(),
+        uploadedBy: 'patient',
         isHandwritten: false,
         ocrStatus: 'complete',
         extractedDiagnoses: ['Hyperlipidemia', 'Poorly controlled Glycemia'],
@@ -831,6 +840,43 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
         uploadedDocuments: [...state.currentPatient.uploadedDocuments, doc],
       },
     })),
+
+  addDocumentToPatient: (patientToken: string, doc: UploadedDocument) => {
+    // 1. Update in mockDatabase
+    let targetPatient = mockDatabase[patientToken];
+    if (!targetPatient) {
+      targetPatient = Object.values(mockDatabase).find(p => p.token === patientToken || p.patientId === patientToken) as PatientData;
+    }
+
+    if (targetPatient) {
+      targetPatient.uploadedDocuments = [doc, ...(targetPatient.uploadedDocuments || [])];
+      
+      // 2. Link to corresponding mockProfiles if available
+      const profileKey = Object.keys(mockProfiles).find(
+        k => mockProfiles[k].name === targetPatient.name || (targetPatient.abhaId && mockProfiles[k].abhaId === targetPatient.abhaId)
+      );
+      if (profileKey) {
+        mockProfiles[profileKey].uploadedDocuments = [doc, ...(mockProfiles[profileKey].uploadedDocuments || [])];
+      }
+
+      // 3. Persist to Supabase
+      syncPatientToSupabase(targetPatient);
+    }
+
+    // 4. Update Zustand state & trigger real-time reactive rerenders
+    set((state) => {
+      const isCurrent = state.currentPatient.token === patientToken || state.currentPatient.patientId === patientToken;
+      return {
+        currentPatient: isCurrent
+          ? { ...state.currentPatient, uploadedDocuments: [doc, ...state.currentPatient.uploadedDocuments] }
+          : state.currentPatient,
+        currentProfile: state.currentProfile && targetPatient && (state.currentProfile.name === targetPatient.name || state.currentProfile.abhaId === targetPatient.abhaId)
+          ? { ...state.currentProfile, uploadedDocuments: [doc, ...state.currentProfile.uploadedDocuments] }
+          : state.currentProfile,
+        queueTrigger: state.queueTrigger + 1
+      };
+    });
+  },
 
   removeDocument: (id) =>
     set((state) => ({

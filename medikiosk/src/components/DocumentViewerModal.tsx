@@ -59,9 +59,11 @@ export default function DocumentViewerModal({
   const handleAppendToNotes = () => {
     if (onAppendNotes) {
       const summaryParts = [
-        `\n[SCANNED ${doc.type.toUpperCase()}: ${doc.name} (${doc.date})]`,
-        doc.extractedDiagnoses?.length ? `• Diagnoses Extracted: ${doc.extractedDiagnoses.join(', ')}` : '',
+        `\n[DOCUMENT: ${doc.name} (${doc.type}) - ${doc.date}]`,
+        doc.uploadedBy === 'doctor' ? `• Uploaded by: Attending Physician` : `• Uploaded by: Patient Kiosk/Mobile Scan`,
+        doc.extractedDiagnoses?.length ? `• Diagnoses: ${doc.extractedDiagnoses.join(', ')}` : '',
         doc.extractedMeds?.length ? `• Scanned Meds: ${doc.extractedMeds.map((m) => `${m.name} (${m.dose})`).join(', ')}` : '',
+        doc.notes ? `• Doctor Findings: ${doc.notes}` : '',
         isHandwritten ? `• Attending Review: Original handwritten script visually verified by physician.` : ''
       ].filter(Boolean).join('\n');
 
@@ -84,13 +86,23 @@ export default function DocumentViewerModal({
               <FileText size={20} />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-extrabold text-slate-900 truncate">{doc.name}</h2>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                   isPrescription ? 'bg-teal-100 text-teal-800' : 'bg-blue-100 text-blue-800'
                 }`}>
                   {doc.type}
                 </span>
+                {doc.uploadedBy === 'doctor' ? (
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-200 flex items-center gap-1">
+                    <Stethoscope size={11} className="text-purple-700" />
+                    Doctor Uploaded
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/70 text-slate-700">
+                    Patient Record
+                  </span>
+                )}
                 {isHandwritten && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200 flex items-center gap-1">
                     <AlertTriangle size={11} className="text-amber-700" />
@@ -99,7 +111,8 @@ export default function DocumentViewerModal({
                 )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Patient: <span className="font-semibold text-slate-700">{patientName}</span> ({patientToken}) • Uploaded / Scanned Date: <span className="font-mono">{doc.date}</span>
+                Patient: <span className="font-semibold text-slate-700">{patientName}</span> ({patientToken}) • Document Date: <span className="font-mono font-medium text-slate-700">{doc.date}</span>
+                {doc.uploadedBy === 'doctor' && ' • Source: Hospital OPD Clinical Upload'}
               </p>
             </div>
           </div>
@@ -331,13 +344,26 @@ export default function DocumentViewerModal({
               <div className="flex items-center gap-2 mb-1">
                 <Stethoscope size={16} className="text-teal-600" />
                 <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900">
-                  OCR Structured Entities
+                  Clinical Entities & Observations
                 </h3>
               </div>
               <p className="text-xs text-slate-500">
-                Machine-extracted parameters from the raw document above. Compare against the visual scan on the left.
+                Structured parameters and physician notations for this record. Compare against the visual document on the left.
               </p>
             </div>
+
+            {/* Clinical / Doctor Notes */}
+            {doc.notes && (
+              <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl space-y-1 text-xs text-amber-900">
+                <div className="font-bold flex items-center gap-1.5 text-amber-950">
+                  <FileText size={14} className="text-amber-700" />
+                  Physician Notations & Observations
+                </div>
+                <p className="leading-relaxed text-[11px] text-amber-900">
+                  {doc.notes}
+                </p>
+              </div>
+            )}
 
             {/* Extracted Diagnoses */}
             <div className="space-y-2">

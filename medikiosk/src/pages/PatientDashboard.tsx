@@ -175,6 +175,8 @@ export default function PatientDashboard() {
                 name: file.name,
                 type: docType,
                 date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                timestamp: Date.now(),
+                uploadedBy: 'patient',
                 fileUrl: rawResult,
                 isHandwritten: isHandwrittenDoc,
                 ocrStatus: ocrSuccess ? 'complete' : 'bypassed_to_doctor',
@@ -901,11 +903,18 @@ export default function PatientDashboard() {
                       </div>
                       <div className="min-w-0">
                         <h4 className="font-semibold text-slate-900 text-xs truncate">{doc.name}</h4>
-                        <p className="text-[11px] text-slate-500 mt-0.5">{doc.type} • Uploaded {doc.date}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {doc.type} • {doc.uploadedBy === 'doctor' ? 'Added by Doctor' : 'Uploaded'} {doc.date}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {doc.ocrStatus === 'bypassed_to_doctor' ? (
+                      {doc.uploadedBy === 'doctor' ? (
+                        <span className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200/70 text-[10px] font-medium rounded-md flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                          Added by Doctor
+                        </span>
+                      ) : doc.ocrStatus === 'bypassed_to_doctor' ? (
                         <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200/70 text-[10px] font-medium rounded-md flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                           Raw Scan Sent to Doctor

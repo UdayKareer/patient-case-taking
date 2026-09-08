@@ -22,7 +22,10 @@ import {
   Activity,
   Clock,
   Stethoscope,
-  Eye
+  Eye,
+  Upload,
+  Calendar,
+  Paperclip
 } from 'lucide-react';
 import { usePatientStore, mockDatabase, mockProfiles, type PatientData, type IpdMedication, type IpdProgressNote, type UploadedDocument, syncPatientToSupabase } from '../store/usePatientStore';
 import type { DoctorOutletContext } from '../components/DoctorLayout';
@@ -100,7 +103,7 @@ export default function DoctorDashboard() {
     setActiveTab: () => {},
   };
 
-  const { currentPatient, initSocket, clearQueue } = usePatientStore();
+  const { currentPatient, initSocket, clearQueue, addDocumentToPatient } = usePatientStore();
   const queueTrigger = usePatientStore(state => state.queueTrigger);
 
   // Search token input
@@ -161,6 +164,103 @@ export default function DoctorDashboard() {
   const [newMedFreq, setNewMedFreq] = useState('1-0-1');
   const [newMedDuration, setNewMedDuration] = useState('7 Days');
   const [newMedInstructions, setNewMedInstructions] = useState('After food');
+
+  // Doctor Upload Document & Diagnostic Report State
+  const [showDocUploadModal, setShowDocUploadModal] = useState(false);
+  const [uploadDocFile, setUploadDocFile] = useState<File | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string>('');
+  const [uploadDocName, setUploadDocName] = useState('');
+  const [uploadDocType, setUploadDocType] = useState<'Prescription' | 'Lab Report' | 'Discharge Summary' | 'ECG / Radiology' | 'Bedside Scan'>('Lab Report');
+  const [uploadDocDate, setUploadDocDate] = useState(() =>
+    new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  );
+  const [uploadDocNotes, setUploadDocNotes] = useState('');
+  const [uploadDiagnoses, setUploadDiagnoses] = useState('');
+  const [uploadTestName, setUploadTestName] = useState('');
+  const [uploadTestValue, setUploadTestValue] = useState('');
+  const [uploadTestUnit, setUploadTestUnit] = useState('');
+  const [uploadTestRange, setUploadTestRange] = useState('');
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+
+  const handleDocFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadDocFile(file);
+      if (!uploadDocName) {
+        setUploadDocName(file.name);
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setUploadPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const resetDocUploadForm = () => {
+    setUploadDocFile(null);
+    setUploadPreviewUrl('');
+    setUploadDocName('');
+    setUploadDocType('Lab Report');
+    setUploadDocDate(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }));
+    setUploadDocNotes('');
+    setUploadDiagnoses('');
+    setUploadTestName('');
+    setUploadTestValue('');
+    setUploadTestUnit('');
+    setUploadTestRange('');
+    setIsUploadingDoc(false);
+    setShowDocUploadModal(false);
+  };
+
+  const handleDoctorSubmitUpload = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUploadingDoc(true);
+
+    const docTitle = uploadDocName.trim() || uploadDocFile?.name || `${uploadDocType}_${selectedPatient.token}`;
+    const docDate = uploadDocDate.trim() || new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    
+    const labs = uploadTestName.trim() ? [{
+      test: uploadTestName.trim(),
+      value: uploadTestValue.trim() || 'Recorded',
+      unit: uploadTestUnit.trim(),
+      range: uploadTestRange.trim() || 'Normal',
+      isOutOfRange: false
+    }] : [];
+
+    const diagnoses = uploadDiagnoses.trim()
+      ? uploadDiagnoses.split(',').map(d => d.trim()).filter(Boolean)
+      : [];
+
+    const newDoc: UploadedDocument = {
+      id: 'doc-' + Date.now(),
+      name: docTitle,
+      type: uploadDocType,
+      date: docDate,
+      timestamp: Date.now(),
+      uploadedBy: 'doctor',
+      fileUrl: uploadPreviewUrl || undefined,
+      isHandwritten: false,
+      ocrStatus: 'complete',
+      notes: uploadDocNotes.trim() || 'Uploaded directly during clinical consultation by attending physician.',
+      extractedDiagnoses: diagnoses,
+      extractedMeds: [],
+      extractedLabs: labs
+    };
+
+    addDocumentToPatient(selectedPatient.token, newDoc);
+
+    const updatedPatient: PatientData = {
+      ...selectedPatient,
+      uploadedDocuments: [newDoc, ...(selectedPatient.uploadedDocuments || [])]
+    };
+    setSelectedPatient(updatedPatient);
+
+    setStatusMessage(`✅ Document "${newDoc.name}" uploaded & linked to ${selectedPatient.name} with date ${newDoc.date}.`);
+    setTimeout(() => setStatusMessage(''), 4000);
+
+    resetDocUploadForm();
+  };
 
   // Apply ESI immediate orders to clinical notes and prescription
   const handleApplyEsiOrders = () => {
@@ -1728,13 +1828,24 @@ export default function DoctorDashboard() {
 
                   {/* O - OBJECTIVE */}
                   <div className="space-y-3 pt-4 border-t border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center font-black text-xs">
-                        O
-                      </span>
-                      <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900">
-                        Objective (OCR Extracted Labs & Prescriptions)
-                      </h3>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center font-black text-xs">
+                          O
+                        </span>
+                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900">
+                          Objective (Scans, Labs & Clinical Reports)
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowDocUploadModal(true)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors cursor-pointer"
+                        title="Upload fresh lab report, bedside ECG, or scan"
+                      >
+                        <Paperclip size={13} />
+                        <span>Attach Report / ECG</span>
+                      </button>
                     </div>
 
                     {/* Highlights from Past Reports */}
@@ -1745,6 +1856,12 @@ export default function DoctorDashboard() {
                             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-slate-900">{doc.name}</span>
+                                {doc.uploadedBy === 'doctor' && (
+                                  <span className="text-[10px] font-semibold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full border border-purple-200 flex items-center gap-1">
+                                    <Stethoscope size={10} className="text-purple-600" />
+                                    Doctor Uploaded
+                                  </span>
+                                )}
                                 {doc.isHandwritten && (
                                   <span className="text-[10px] font-semibold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">
                                     Handwritten Scan
@@ -2203,9 +2320,19 @@ export default function DoctorDashboard() {
                         Scanned Prescriptions & Lab Documents ({selectedPatient.uploadedDocuments?.length || 0})
                       </h3>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        ABDM optical ingestion pipeline with raw document bypass for handwritten cursive clinical slips.
+                        ABDM optical ingestion pipeline with raw document bypass and direct physician report uploads.
                       </p>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowDocUploadModal(true)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                      title="Upload and link a new report to this patient"
+                    >
+                      <Upload size={14} />
+                      <span>Upload Report / Scan</span>
+                    </button>
                   </div>
 
                   {!selectedPatient.uploadedDocuments || selectedPatient.uploadedDocuments.length === 0 ? (
@@ -2235,11 +2362,23 @@ export default function DoctorDashboard() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {doc.uploadedBy === 'doctor' ? (
+                              <span className="text-[10px] font-bold text-purple-800 bg-purple-100 border border-purple-300 px-2.5 py-1 rounded-md flex items-center gap-1">
+                                <Stethoscope size={12} className="text-purple-700" />
+                                Doctor Uploaded ({doc.date})
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md flex items-center gap-1">
+                                <FileText size={11} className="text-slate-500" />
+                                Patient Upload ({doc.date})
+                              </span>
+                            )}
+
                             {doc.ocrStatus === 'bypassed_to_doctor' || doc.isHandwritten ? (
                               <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-md flex items-center gap-1">
                                 <AlertTriangle size={12} className="text-amber-600" />
-                                Handwritten / Bypassed to Doctor
+                                Handwritten / Bypassed
                               </span>
                             ) : (
                               <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-md flex items-center gap-1">
@@ -2543,6 +2682,188 @@ export default function DoctorDashboard() {
             setTimeout(() => setStatusMessage(''), 3000);
           }}
         />
+      )}
+
+      {/* Doctor Document & Diagnostic Report Upload Modal */}
+      {showDocUploadModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                  <Upload size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">Upload & Link Clinical Document</h3>
+                  <p className="text-xs text-slate-500">
+                    Linking to: <span className="font-semibold text-slate-800">{selectedPatient.name}</span> ({selectedPatient.token})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={resetDocUploadForm}
+                className="w-8 h-8 rounded-xl bg-slate-200/80 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleDoctorSubmitUpload} className="p-6 space-y-4 overflow-y-auto">
+              {/* File Drop / Selection Area */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  Select Document File (Scan, ECG, Photo, or PDF):
+                </label>
+                <div className="relative border-2 border-dashed border-slate-300 hover:border-teal-500 rounded-2xl p-4 text-center bg-slate-50/50 hover:bg-teal-50/30 transition-colors cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={handleDocFileSelect}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  {uploadDocFile ? (
+                    <div className="space-y-1">
+                      <FileText size={28} className="mx-auto text-teal-600" />
+                      <div className="text-xs font-bold text-slate-900">{uploadDocFile.name}</div>
+                      <div className="text-[11px] text-slate-500">
+                        {(uploadDocFile.size / 1024).toFixed(1)} KB • Click or drop another to replace
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 py-2">
+                      <Upload size={28} className="mx-auto text-slate-400" />
+                      <div className="text-xs font-bold text-slate-700">Click or drag & drop document file here</div>
+                      <div className="text-[11px] text-slate-400">Supports JPG, PNG, WebP, PDF or bedside mobile scans</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Document Type */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Document Category:
+                  </label>
+                  <select
+                    value={uploadDocType}
+                    onChange={(e) => setUploadDocType(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-teal-500/20 outline-none cursor-pointer"
+                  >
+                    <option value="Lab Report">Lab Report</option>
+                    <option value="Prescription">Prescription</option>
+                    <option value="ECG / Radiology">ECG / Radiology</option>
+                    <option value="Discharge Summary">Discharge Summary</option>
+                    <option value="Bedside Scan">Bedside Scan</option>
+                  </select>
+                </div>
+
+                {/* Document Date */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Document / Report Date:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={uploadDocDate}
+                      onChange={(e) => setUploadDocDate(e.target.value)}
+                      placeholder="e.g. 08 Sep 2026"
+                      className="w-full px-3 py-2 pl-8 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-teal-500/20 outline-none"
+                      required
+                    />
+                    <Calendar size={13} className="absolute left-2.5 top-3 text-slate-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Document Title / Name */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Document Title:
+                </label>
+                <input
+                  type="text"
+                  value={uploadDocName}
+                  onChange={(e) => setUploadDocName(e.target.value)}
+                  placeholder="e.g. Bedside 12-Lead ECG, Blood CBC Report, Chest X-Ray..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-teal-500/20 outline-none"
+                  required
+                />
+              </div>
+
+              {/* Doctor Impressions / Notations */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Doctor Clinical Impressions & Notations:
+                </label>
+                <textarea
+                  rows={2}
+                  value={uploadDocNotes}
+                  onChange={(e) => setUploadDocNotes(e.target.value)}
+                  placeholder="e.g. Normal sinus rhythm, no acute ischemic ST changes. External lab verified by Dr..."
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-teal-500/20 outline-none leading-relaxed"
+                />
+              </div>
+
+              {/* Optional Key Findings / Parameters */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
+                  Quick Diagnostic Parameter (Optional):
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <input
+                    type="text"
+                    placeholder="Test (e.g. Troponin)"
+                    value={uploadTestName}
+                    onChange={(e) => setUploadTestName(e.target.value)}
+                    className="p-2 bg-white border border-slate-200 rounded-lg text-xs"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Value (e.g. 0.02)"
+                    value={uploadTestValue}
+                    onChange={(e) => setUploadTestValue(e.target.value)}
+                    className="p-2 bg-white border border-slate-200 rounded-lg text-xs"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Unit (e.g. ng/mL)"
+                    value={uploadTestUnit}
+                    onChange={(e) => setUploadTestUnit(e.target.value)}
+                    className="p-2 bg-white border border-slate-200 rounded-lg text-xs"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Range (e.g. <0.04)"
+                    value={uploadTestRange}
+                    onChange={(e) => setUploadTestRange(e.target.value)}
+                    className="p-2 bg-white border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={resetDocUploadForm}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploadingDoc}
+                  className="px-5 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Upload size={14} />
+                  <span>Upload & Link to Patient Record</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
     </div>
