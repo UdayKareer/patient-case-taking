@@ -1290,7 +1290,7 @@ export default function DoctorDashboard() {
                     className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-98"
                   >
                     <Save size={14} />
-                    <span>Discharge / Save</span>
+                    <span>OPD Done / Relieved</span>
                   </button>
                 </div>
 
@@ -1428,91 +1428,49 @@ export default function DoctorDashboard() {
                           <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                             <span className="text-teal-700 font-black mr-1">[S]</span>Site & Location
                           </span>
-                          <input
-                            type="text"
-                            value={selectedPatient.symptomSite || ''}
-                            onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomSite: e.target.value })}
-                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                            placeholder="e.g. Retrosternal"
-                          />
+                          <textarea value={selectedPatient.symptomSite || ''} onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomSite: e.target.value })} className="w-full font-semibold text-slate-900 outline-none bg-transparent resize-none leading-snug py-1" rows={2} placeholder="e.g. Retrosternal" />
                         </div>
 
                         <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
                           <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                             <span className="text-teal-700 font-black mr-1">[O]</span>Onset & Duration
                           </span>
-                          <input
-                            type="text"
-                            value={selectedPatient.symptomDuration || ''}
-                            onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomDuration: e.target.value })}
-                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                            placeholder="e.g. Sudden / 45 mins ago"
-                          />
+                          <textarea value={selectedPatient.symptomDuration || ''} onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomDuration: e.target.value })} className="w-full font-semibold text-slate-900 outline-none bg-transparent resize-none leading-snug py-1" rows={2} placeholder="e.g. Sudden / 45 mins ago" />
                         </div>
 
                         <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
                           <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                             <span className="text-teal-700 font-black mr-1">[C]</span>Character / Nature
                           </span>
-                          <input
-                            type="text"
-                            value={selectedPatient.symptomCharacter || ''}
-                            onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomCharacter: e.target.value })}
-                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                            placeholder="e.g. Crushing, burning, stabbing"
-                          />
+                          <textarea value={selectedPatient.symptomCharacter || ''} onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomCharacter: e.target.value })} className="w-full font-semibold text-slate-900 outline-none bg-transparent resize-none leading-snug py-1" rows={2} placeholder="e.g. Crushing, burning, stabbing" />
                         </div>
 
                         <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
                           <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                             <span className="text-teal-700 font-black mr-1">[R]</span>Radiation
                           </span>
-                          <input
-                            type="text"
-                            value={selectedPatient.symptomRadiation || ''}
-                            onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomRadiation: e.target.value })}
-                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                            placeholder="e.g. Left arm, jaw, none"
-                          />
+                          <textarea value={selectedPatient.symptomRadiation || ''} onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomRadiation: e.target.value })} className="w-full font-semibold text-slate-900 outline-none bg-transparent resize-none leading-snug py-1" rows={2} placeholder="e.g. Left arm, jaw, none" />
                         </div>
 
                         <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
                           <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                             <span className="text-teal-700 font-black mr-1">[T]</span>Timing / Course
                           </span>
-                          <input
-                            type="text"
-                            value={selectedPatient.symptomTiming || ''}
-                            onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomTiming: e.target.value })}
-                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                            placeholder="e.g. Constant, episodic waves"
-                          />
+                          <textarea value={selectedPatient.symptomTiming || ''} onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomTiming: e.target.value })} className="w-full font-semibold text-slate-900 outline-none bg-transparent resize-none leading-snug py-1" rows={2} placeholder="e.g. Constant, episodic waves" />
                         </div>
 
                         <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
                           <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                             <span className="text-teal-700 font-black mr-1">[E+]</span>Aggravating Factors
                           </span>
-                          <input
-                            type="text"
-                            value={selectedPatient.aggravatingFactors || ''}
-                            onChange={(e) => setSelectedPatient({ ...selectedPatient, aggravatingFactors: e.target.value })}
-                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                            placeholder="e.g. Exertion, food"
-                          />
+                          <textarea value={selectedPatient.aggravatingFactors || ''} onChange={(e) => setSelectedPatient({ ...selectedPatient, aggravatingFactors: e.target.value })} className="w-full font-semibold text-slate-900 outline-none bg-transparent resize-none leading-snug py-1" rows={2} placeholder="e.g. Exertion, food" />
                         </div>
 
                         <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
                           <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                             <span className="text-teal-700 font-black mr-1">[E-]</span>Relieving Factors
                           </span>
-                          <input
-                            type="text"
-                            value={selectedPatient.relievingFactors || ''}
-                            onChange={(e) => setSelectedPatient({ ...selectedPatient, relievingFactors: e.target.value })}
-                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                            placeholder="e.g. Rest, antacid"
-                          />
+                          <textarea value={selectedPatient.relievingFactors || ''} onChange={(e) => setSelectedPatient({ ...selectedPatient, relievingFactors: e.target.value })} className="w-full font-semibold text-slate-900 outline-none bg-transparent resize-none leading-snug py-1" rows={2} placeholder="e.g. Rest, antacid" />
                         </div>
 
                         <div className="p-3 bg-white rounded-xl border border-slate-200">
