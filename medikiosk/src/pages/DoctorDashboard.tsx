@@ -526,7 +526,7 @@ export default function DoctorDashboard() {
                 onClick={() => {
                   if (window.confirm("Are you sure you want to clear all demo patients from the queue and cloud database?")) {
                     clearQueue();
-                    setSelectedPatient(null);
+                    window.location.reload();
                   }
                 }}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 transition-colors shadow-2xs flex items-center gap-1.5 border border-red-200"
@@ -567,6 +567,7 @@ export default function DoctorDashboard() {
               >
                 Waiting ({allQueuePatients.filter(p => p.status === 'waiting').length})
               </button>
+            </div>
             </div>
           </div>
 
@@ -2129,3 +2130,5 @@ export default function DoctorDashboard() {
     </div>
   );
 }
+
+
