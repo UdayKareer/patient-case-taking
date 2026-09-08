@@ -112,7 +112,7 @@ export default function DoctorDashboard() {
     setActiveTab: () => {},
   };
 
-  const { currentPatient, initSocket, clearQueue, addDocumentToPatient } = usePatientStore();
+  const { currentPatient, initSocket, clearQueue, addDocumentToPatient, updatePatientIntegrativeExam } = usePatientStore();
   const queueTrigger = usePatientStore(state => state.queueTrigger);
 
   // Search token input
@@ -125,6 +125,13 @@ export default function DoctorDashboard() {
     initSocket();
     // Use queueTrigger to silence TS, it naturally triggers a re-render from Zustand
   }, [initSocket, queueTrigger]);
+
+  // Synchronize selectedPatient whenever queueTrigger updates from intake or cross-tab events
+  useEffect(() => {
+    if (selectedPatient?.token && mockDatabase[selectedPatient.token]) {
+      setSelectedPatient(mockDatabase[selectedPatient.token]);
+    }
+  }, [queueTrigger, selectedPatient?.token]);
 
   // Live real-time ticker: re-renders every 1 second so wait times tick live without page refresh
   const [, setLiveTick] = useState(0);
@@ -219,6 +226,7 @@ export default function DoctorDashboard() {
       mockDatabase[updated.token] = updated;
     }
     syncPatientToSupabase(updated);
+    updatePatientIntegrativeExam(updated.token, updated.dashavidha || {}, updated.ashtaSthana || {});
     setIsEditingIntegrativeExam(false);
     setStatusMessage('✅ Bedside physical examination recorded by physician and saved to patient EHR history.');
     setTimeout(() => setStatusMessage(''), 4000);
@@ -508,25 +516,24 @@ export default function DoctorDashboard() {
     const a = selectedPatient.ashtaSthana || {};
 
     const lines = [
-      '\n[INTEGRATIVE CLINICAL PARIKSHA PROFILE (SIH 26047)]:',
-      `• Constitution (Prakriti): ${d.prakriti || selectedPatient.prakriti || 'Vata-Pitta'}`,
-      `• Morbidity / Imbalance (Vikriti): ${d.vikriti || 'Pitta Imbalance (Hyperacidity/Vidaha)'}`,
-      `• Tissue Vitality (Sara): ${d.sara || 'Madhyama Reserve'}`,
-      `• Skeletal Build (Samhanana): ${d.samhanana || 'Average Build'}`,
-      `• Proportions (Pramana): ${d.pramana || 'Symmetrical & Proportionate'}`,
-      `• Adaptability (Satmya): ${d.satmya || 'Moderate Adaptability'}`,
-      `• Mental Resilience (Sattva): ${d.sattva || 'Madhyama Resilience'}`,
-      `• Digestive Capacity (Agni): ${d.aharaShakti || selectedPatient.agni || 'Samagni (Optimal balanced)'}`,
-      `• Physical Stamina (Vyayama): ${d.vyayamaShakti || 'Moderate Endurance'}`,
-      `• Pulse (Nadi): ${a.nadi || 'Normal Regular (70-80 bpm)'}`,
-      `• Tongue (Jihwa): ${a.jihwa || 'Clean & Pink (Nirama)'}`,
-      `• Bowel (Mala): ${a.mala || selectedPatient.koshtha || 'Normal Formed'}`,
-      `• Urine (Mutra): ${a.mutra || 'Clear Pale Yellow'}`,
-      `• Skin (Sparsha): ${a.sparsha || 'Smooth & Normal (Snigdha)'}`,
-      `• Facies & Demeanor (Akruti): ${a.akruti || 'Comfortable & Normal'}`
+      '\n[BEDSIDE PHYSICAL & SYSTEMIC EXAMINATION (SIH 26047)]:',
+      `• Pulse & Rhythm (Nadi): ${a.nadi || 'Pending Bedside Exam'}`,
+      `• Tongue & Oral Mucosa (Jihwa): ${a.jihwa || 'Pending Bedside Exam'}`,
+      `• Tissue Vitality & Reserve (Sara): ${d.sara || 'Pending Bedside Assessment'}`,
+      `• Musculoskeletal Build (Samhanana): ${d.samhanana || 'Pending Bedside Assessment'}`,
+      `• Skin & Temperature (Sparsha): ${a.sparsha || 'Pending Bedside Exam'}`,
+      `• Proportions (Pramana): ${d.pramana || 'Pending Bedside Assessment'}`,
+      `• Baseline Constitution (Prakriti): ${d.prakriti || selectedPatient.prakriti || (selectedPatient.mode === 'ayush' ? 'Pending Intake' : 'General Constitutional Balance')}`,
+      `• Morbidity / Imbalance (Vikriti): ${d.vikriti || 'Pending Bedside Assessment'}`,
+      `• Digestive Capacity (Agni): ${d.aharaShakti || selectedPatient.agni || 'Pending Intake'}`,
+      `• Physical Stamina (Vyayama): ${d.vyayamaShakti || 'Pending Bedside Assessment'}`,
+      `• Bowel Nature (Mala): ${a.mala || selectedPatient.koshtha || 'Pending Intake'}`,
+      `• Urine Characteristics (Mutra): ${a.mutra || 'Pending Bedside Assessment'}`,
+      `• Sclera & Eyes (Druk): ${a.druk || 'Pending Bedside Exam'}`,
+      `• Facies & Demeanor (Akruti): ${a.akruti || 'Pending Bedside Exam'}`
     ];
     setDoctorNotes((prev) => (prev ? `${prev.trim()}\n${lines.join('\n')}` : lines.join('\n').trim()));
-    setStatusMessage('🌿 Integrative Clinical Pariksha appended to physician impressions.');
+    setStatusMessage('🩺 Bedside physical findings appended to clinical impressions.');
     setTimeout(() => setStatusMessage(''), 3500);
   };
 
@@ -1948,19 +1955,22 @@ export default function DoctorDashboard() {
                   <span>OCR Document Scans & Labs ({selectedPatient.uploadedDocuments.length})</span>
                 </button>
 
-                {(selectedPatient.mode === 'ayush' || (selectedPatient.consentAyush && (Boolean(selectedPatient.prakriti) || Boolean(selectedPatient.ayushResponses?.length)))) && (
-                  <button
-                    onClick={() => setActiveChartTab('ayush')}
-                    className={`py-3 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
-                      activeChartTab === 'ayush'
-                        ? 'border-emerald-700 text-emerald-800 bg-white shadow-2xs'
-                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <Leaf size={15} className="text-emerald-600" />
-                    <span>AYUSH Integrative Pariksha</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => setActiveChartTab('ayush')}
+                  className={`py-3 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+                    activeChartTab === 'ayush'
+                      ? 'border-emerald-700 text-emerald-800 bg-white shadow-2xs'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Stethoscope size={15} className="text-emerald-600" />
+                  <span>Bedside Physical Exam (10-Fold & 8-Point)</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    isExamDocumented ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
+                  }`}>
+                    {isExamDocumented ? 'Verified' : 'Pending'}
+                  </span>
+                </button>
 
 
                 <button
@@ -2130,18 +2140,131 @@ export default function DoctorDashboard() {
                           O
                         </span>
                         <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900">
-                          Objective (Scans, Labs & Clinical Reports)
+                          Objective (Physical Exam, Labs & Scanned Reports)
                         </h3>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowDocUploadModal(true)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors cursor-pointer"
-                        title="Upload fresh lab report, bedside ECG, or scan"
-                      >
-                        <Paperclip size={13} />
-                        <span>Attach Report / ECG</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveChartTab('ayush');
+                            setIsEditingIntegrativeExam(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors cursor-pointer"
+                          title="Record or update bedside physical exam"
+                        >
+                          <Stethoscope size={13} />
+                          <span>{isExamDocumented ? 'Edit Bedside Exam' : 'Record Bedside Exam'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowDocUploadModal(true)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors cursor-pointer"
+                          title="Upload fresh lab report, bedside ECG, or scan"
+                        >
+                          <Paperclip size={13} />
+                          <span>Attach Report / ECG</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bedside Physical Examination & Constitutional Matrix (10-Fold & 8-Point) */}
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Stethoscope size={16} className="text-emerald-700" />
+                          <span className="text-xs font-black uppercase tracking-wider text-slate-900">
+                            Bedside Physical & Systemic Examination (Dashavidha & Ashta Sthana)
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isExamDocumented 
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                              : 'bg-amber-100 text-amber-800 border border-amber-300'
+                          }`}>
+                            {isExamDocumented ? '✓ Clinician Exam on File' : '⚠️ Pending Bedside Examination'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveChartTab('ayush');
+                              setIsEditingIntegrativeExam(true);
+                            }}
+                            className="px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-100/70 hover:bg-emerald-200 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <Edit3 size={12} />
+                            <span>{isExamDocumented ? 'Edit / Re-Examine' : 'Record Bedside Findings'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAppendIntegrativeExamToNotes}
+                            className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                            title="Append findings to clinical impressions note"
+                          >
+                            <Sparkles size={12} className="text-emerald-600" />
+                            <span>Append to Notes</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 6-box Clinical Matrix */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
+                            Pulse & Arterial Wave (Nadi)
+                          </span>
+                          <span className={`font-bold text-xs ${selectedPatient.ashtaSthana?.nadi ? 'text-slate-900' : 'text-amber-700 italic'}`}>
+                            {selectedPatient.ashtaSthana?.nadi || 'Pending Bedside Palpation'}
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
+                            Tongue & Oral Mucosa (Jihwa)
+                          </span>
+                          <span className={`font-bold text-xs ${selectedPatient.ashtaSthana?.jihwa ? 'text-slate-900' : 'text-amber-700 italic'}`}>
+                            {selectedPatient.ashtaSthana?.jihwa || 'Pending Oral Inspection'}
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
+                            Tissue Vitality & Reserve (Sara)
+                          </span>
+                          <span className={`font-bold text-xs ${selectedPatient.dashavidha?.sara ? 'text-slate-900' : 'text-amber-700 italic'}`}>
+                            {selectedPatient.dashavidha?.sara || 'Pending Assessment'}
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
+                            Musculoskeletal Build (Samhanana)
+                          </span>
+                          <span className={`font-bold text-xs ${selectedPatient.dashavidha?.samhanana ? 'text-slate-900' : 'text-amber-700 italic'}`}>
+                            {selectedPatient.dashavidha?.samhanana || 'Pending Assessment'}
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
+                            Skin, Moisture & Temp (Sparsha)
+                          </span>
+                          <span className={`font-bold text-xs ${selectedPatient.ashtaSthana?.sparsha ? 'text-slate-900' : 'text-amber-700 italic'}`}>
+                            {selectedPatient.ashtaSthana?.sparsha || 'Pending Bedside Exam'}
+                          </span>
+                        </div>
+
+                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
+                            Baseline Constitution (Prakriti)
+                          </span>
+                          <span className="font-bold text-xs text-slate-900">
+                            {selectedPatient.prakriti || selectedPatient.dashavidha?.prakriti || (selectedPatient.mode === 'ayush' ? 'Pending Intake' : 'General Metabolic Balance')}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Highlights from Past Reports */}

@@ -270,19 +270,7 @@ export default function PatientDashboard() {
           />
         </nav>
         
-        <div className="p-3 border-t border-slate-100 space-y-1">
-          {currentProfile.phone === '9811223344' && (
-            <button
-              onClick={() => {
-                resetDemoSession();
-                navigate('/patient/login');
-              }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50/80 rounded-lg transition-colors"
-              title="Cleanly reset demo profile and clear past session data"
-            >
-              <RotateCcw size={13} /> Reset Demo Session
-            </button>
-          )}
+        <div className="p-3 border-t border-slate-100">
           <button 
             onClick={handleLogout}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-500 hover:text-red-600 hover:bg-red-50/80 rounded-lg transition-colors"
@@ -306,18 +294,6 @@ export default function PatientDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {currentProfile.phone === '9811223344' && (
-              <button
-                onClick={() => {
-                  resetDemoSession();
-                  navigate('/patient/login');
-                }}
-                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                title="Reset Demo Session"
-              >
-                <RotateCcw size={16} />
-              </button>
-            )}
             <button 
               onClick={handleLogout}
               className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -489,7 +465,7 @@ export default function PatientDashboard() {
                       className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5"
                     >
                       <RotateCcw size={12} />
-                      <span>{currentProfile.phone === '9811223344' ? 'Reset Demo & Start Fresh Intake' : 'Start Another Consultation'}</span>
+                      <span>Start Another Consultation</span>
                     </button>
                   </div>
                 </div>

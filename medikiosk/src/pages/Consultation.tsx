@@ -10,9 +10,11 @@ import {
   Leaf,
   Sparkles,
   MapPin,
-  Stethoscope
+  Stethoscope,
+  Camera,
+  Paperclip
 } from 'lucide-react';
-import { usePatientStore } from '../store/usePatientStore';
+import { usePatientStore, type UploadedDocument } from '../store/usePatientStore';
 import {
   CHIEF_COMPLAINT_PRESETS,
   SOCRATES_OPTIONS,
@@ -35,7 +37,7 @@ import {
 
 export default function Consultation() {
   const navigate = useNavigate();
-  const { currentPatient, currentProfile, updatePatient, evaluateTriageAndSummary, saveToDatabase, soundEnabled } =
+  const { currentPatient, currentProfile, updatePatient, evaluateTriageAndSummary, saveToDatabase, soundEnabled, addDocument } =
     usePatientStore();
 
   if (!currentProfile) {
@@ -424,6 +426,39 @@ export default function Consultation() {
     }, 280);
   };
 
+  // Handle physical prescription slip / lab report photo upload at kiosk intake
+  const handleKioskFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const isSlip =
+        file.name.toLowerCase().includes('rx') ||
+        file.name.toLowerCase().includes('presc') ||
+        file.type.includes('image');
+      const newDoc: UploadedDocument = {
+        id: 'kiosk-doc-' + Date.now(),
+        name: file.name,
+        type: isSlip ? 'Prescription' : 'Lab Report',
+        date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        timestamp: Date.now(),
+        uploadedBy: 'patient',
+        fileUrl: reader.result as string,
+        isHandwritten: isSlip,
+        ocrStatus: isSlip ? 'bypassed_to_doctor' : 'complete',
+        notes: isSlip
+          ? 'Physical slip photographed at kiosk intake; bypassed directly for physician visual review.'
+          : 'Attached at kiosk intake.',
+        extractedDiagnoses: [],
+        extractedMeds: [],
+        extractedLabs: []
+      };
+      addDocument(newDoc);
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="min-h-[85vh] flex flex-col justify-between max-w-2xl mx-auto px-4 py-6">
       
@@ -607,6 +642,58 @@ export default function Consultation() {
                       )
                     )}
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Document / Prescription Bypass Upload Card */}
+            <div className="pt-3 border-t border-slate-100">
+              <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                    <Paperclip size={16} />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">
+                      {isHindi ? 'पुरानी पर्ची या जांच रिपोर्ट साथ लाए हैं?' : 'Have a past prescription or lab report?'}
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      {isHindi
+                        ? 'फोटो या फ़ाइल जोड़ें — डॉक्टर इसे सीधे अपने कंप्यूटर पर देख सकेंगे।'
+                        : 'Attach scan or photo — optical OCR will bypass handwritten notes straight to the doctor.'}
+                    </span>
+                  </div>
+                </div>
+
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold shadow-2xs transition-colors cursor-pointer shrink-0">
+                  <Camera size={14} />
+                  <span>{isHindi ? 'पर्ची जोड़ें' : 'Attach Report'}</span>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={handleKioskFileUpload}
+                  />
+                </label>
+              </div>
+
+              {/* Uploaded Documents Preview List */}
+              {currentPatient.uploadedDocuments && currentPatient.uploadedDocuments.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {currentPatient.uploadedDocuments.map((doc) => (
+                    <div key={doc.id} className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                        <span className="font-bold text-emerald-900 truncate max-w-[200px]">{doc.name}</span>
+                        <span className="text-[10px] bg-emerald-200/80 text-emerald-800 px-1.5 py-0.5 rounded font-semibold">
+                          {doc.type}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-emerald-700 font-medium shrink-0">
+                        ✓ {isHindi ? 'डॉक्टर को प्रेषित' : 'Bypassed to Doctor'}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

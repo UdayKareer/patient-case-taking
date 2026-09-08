@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, HeartPulse, User, Calendar, UserRound, Sparkles, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, HeartPulse, User, Calendar, UserRound, Sparkles } from 'lucide-react';
 import { usePatientStore } from '../store/usePatientStore';
 
 export default function PatientLogin() {
@@ -11,19 +11,11 @@ export default function PatientLogin() {
   const [loginId, setLoginId] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [regData, setRegData] = useState({ name: '', age: '', gender: 'Male' });
-  const [resetFeedback, setResetFeedback] = useState('');
 
   const handleQuickDemoLogin = () => {
     resetDemoSession();
     loginProfile('9811223344');
     navigate('/patient/dashboard');
-  };
-
-  const handleManualResetDemo = () => {
-    resetDemoSession();
-    setLoginId('');
-    setResetFeedback(isHindi ? '✅ डेमो सत्र रीसेट कर दिया गया है!' : '✅ Demo session freshly reset! All past consultation data cleared.');
-    setTimeout(() => setResetFeedback(''), 4000);
   };
 
   const handleNext = (e: React.FormEvent) => {
@@ -171,49 +163,18 @@ export default function PatientLogin() {
           <span className="text-[11px] text-slate-400 font-mono">256-bit SSL</span>
         </div>
         
-        {/* Demo Helper & 1-Click Presentation Controls */}
+        {/* Demo Helper */}
         {!isRegistering && (
-          <div className="mt-4 p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 text-[11px] text-slate-600 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-800 flex items-center gap-1">
-                <Sparkles size={13} className="text-amber-500" />
-                <span>SIH Demo & Presentation Profile:</span>
-              </span>
-              <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold">
-                9811223344
-              </span>
-            </div>
-
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Ramesh Sharma (Known T2DM + HTN history with verified lab reports). Each demonstration session starts fresh without lingering test inputs.
-            </p>
-
-            {resetFeedback && (
-              <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold flex items-center gap-1.5 text-[11px] animate-fade-in">
-                <CheckCircle2 size={13} className="shrink-0 text-emerald-600" />
-                <span>{resetFeedback}</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={handleQuickDemoLogin}
-                className="w-full py-2 px-3 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-              >
-                <Sparkles size={13} />
-                <span>Quick Demo Login</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleManualResetDemo}
-                className="w-full py-2 px-3 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-              >
-                <RotateCcw size={12} />
-                <span>Reset Demo Session</span>
-              </button>
-            </div>
+          <div className="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500 font-medium">Demo / Presentation:</span>
+            <button
+              type="button"
+              onClick={handleQuickDemoLogin}
+              className="px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Sparkles size={12} className="text-amber-500" />
+              <span>Use Demo (9811223344)</span>
+            </button>
           </div>
         )}
       </div>

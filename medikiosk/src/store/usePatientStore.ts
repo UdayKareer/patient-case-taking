@@ -805,6 +805,16 @@ export const mockProfiles: Record<string, PatientProfile> = {
   '9811223344': getFreshDemoProfile()
 };
 
+function broadcastSync(event: { type: string; [key: string]: any }) {
+  if (typeof window !== 'undefined') {
+    try {
+      const channel = new BroadcastChannel('medikiosk_channel');
+      channel.postMessage(event);
+      channel.close();
+    } catch (e) {}
+  }
+}
+
 export const usePatientStore = create<PatientStore>((set, get) => ({
   currentPatient: createInitialPatient(),
   currentProfile: null,
@@ -826,6 +836,11 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
   },
 
   loginProfile: (id, regData) => {
+    // If demo account, always restore pristine profile
+    if (id === '9811223344' || id === '88-3921-9941-0021') {
+      mockProfiles['9811223344'] = getFreshDemoProfile();
+    }
+
     // Mock login by matching phone or abhaId
     const profile = Object.values(mockProfiles).find(p => p.phone === id || p.abhaId === id);
     if (profile) {
@@ -937,9 +952,18 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
 
       // 3. Persist to Supabase
       syncPatientToSupabase(targetPatient);
+
+      // 4. Cross-tab & local storage persistence
+      broadcastSync({ type: 'DOC_ADDED', patientToken, doc });
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('medikiosk_p_' + targetPatient.token, JSON.stringify(targetPatient));
+          localStorage.setItem('medikiosk_latest_patient', JSON.stringify(targetPatient));
+        } catch (e) {}
+      }
     }
 
-    // 4. Update Zustand state & trigger real-time reactive rerenders
+    // 5. Update Zustand state & trigger real-time reactive rerenders
     set((state) => {
       const isCurrent = state.currentPatient.token === patientToken || state.currentPatient.patientId === patientToken;
       return {
@@ -966,6 +990,15 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
       if (dashavidha.aharaShakti) targetPatient.agni = dashavidha.aharaShakti;
       if (ashtaSthana.mala) targetPatient.koshtha = ashtaSthana.mala;
       syncPatientToSupabase(targetPatient);
+
+      // Cross-tab & local storage persistence
+      broadcastSync({ type: 'EXAM_UPDATED', patientToken, dashavidha, ashtaSthana });
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('medikiosk_p_' + targetPatient.token, JSON.stringify(targetPatient));
+          localStorage.setItem('medikiosk_latest_patient', JSON.stringify(targetPatient));
+        } catch (e) {}
+      }
     }
     set((state) => {
       const isCurrent = state.currentPatient.token === patientToken || state.currentPatient.patientId === patientToken;
@@ -1190,6 +1223,20 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
       console.warn('Supabase sync error:', e);
     }
 
+    // Cross-tab broadcast & localStorage persistence
+    broadcastSync({ type: 'PATIENT_SAVED', patient: fullPatient });
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('medikiosk_latest_patient', JSON.stringify(fullPatient));
+        localStorage.setItem('medikiosk_p_' + fullPatient.token, JSON.stringify(fullPatient));
+        const tokens: string[] = JSON.parse(localStorage.getItem('medikiosk_tokens') || '[]');
+        if (!tokens.includes(fullPatient.token)) {
+          tokens.push(fullPatient.token);
+          localStorage.setItem('medikiosk_tokens', JSON.stringify(tokens));
+        }
+      } catch (e) {}
+    }
+
     // Real-time sync to Doctor's Dashboard (50ms latency)
     socket.emit('patient_intake_submitted', fullPatient);
   },
@@ -1228,6 +1275,66 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
       mockDatabase[data.token] = data;
       get().triggerQueueUpdate();
     });
+
+    // Cross-tab broadcast & localStorage hydration
+    if (typeof window !== 'undefined') {
+      try {
+        const tokens: string[] = JSON.parse(localStorage.getItem('medikiosk_tokens') || '[]');
+        tokens.forEach((tok) => {
+          try {
+            const raw = localStorage.getItem('medikiosk_p_' + tok);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed && parsed.token) {
+                mockDatabase[parsed.token] = parsed;
+              }
+            }
+          } catch (e) {}
+        });
+        get().triggerQueueUpdate();
+      } catch (e) {}
+
+      try {
+        const channel = new BroadcastChannel('medikiosk_channel');
+        channel.onmessage = (ev) => {
+          if (ev.data?.type === 'PATIENT_SAVED' && ev.data.patient) {
+            mockDatabase[ev.data.patient.token] = ev.data.patient;
+            get().triggerQueueUpdate();
+          } else if (ev.data?.type === 'DOC_ADDED' && ev.data.patientToken && ev.data.doc) {
+            let target: PatientData | undefined = mockDatabase[ev.data.patientToken];
+            if (!target) {
+              target = Object.values(mockDatabase).find(p => p.token === ev.data.patientToken || p.patientId === ev.data.patientToken);
+            }
+            if (target) {
+              target.uploadedDocuments = [ev.data.doc, ...(target.uploadedDocuments || [])];
+              get().triggerQueueUpdate();
+            }
+          } else if (ev.data?.type === 'EXAM_UPDATED' && ev.data.patientToken) {
+            let target: PatientData | undefined = mockDatabase[ev.data.patientToken];
+            if (!target) {
+              target = Object.values(mockDatabase).find(p => p.token === ev.data.patientToken || p.patientId === ev.data.patientToken);
+            }
+            if (target) {
+              target.dashavidha = { ...(target.dashavidha || {}), ...ev.data.dashavidha };
+              target.ashtaSthana = { ...(target.ashtaSthana || {}), ...ev.data.ashtaSthana };
+              get().triggerQueueUpdate();
+            }
+          }
+        };
+      } catch (e) {}
+
+      window.addEventListener('storage', (ev) => {
+        if (ev.key === 'medikiosk_latest_patient' && ev.newValue) {
+          try {
+            const p = JSON.parse(ev.newValue);
+            if (p && p.token) {
+              mockDatabase[p.token] = p;
+              get().triggerQueueUpdate();
+            }
+          } catch (e) {}
+        }
+      });
+    }
 
     // Supabase cloud data initialization
     try {
