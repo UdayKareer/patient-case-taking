@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   Search,
@@ -25,12 +25,15 @@ import {
   Eye,
   Upload,
   Calendar,
-  Paperclip
+  Paperclip,
+  Mic,
+  MicOff
 } from 'lucide-react';
 import { usePatientStore, mockDatabase, mockProfiles, type PatientData, type IpdMedication, type IpdProgressNote, type UploadedDocument, syncPatientToSupabase } from '../store/usePatientStore';
 import type { DoctorOutletContext } from '../components/DoctorLayout';
 import OPDPrescriptionModal from '../components/OPDPrescriptionModal';
 import DocumentViewerModal from '../components/DocumentViewerModal';
+import { UnifiedVoiceSession, type VoiceState } from '../services/whisperService';
 import { getEsiMetadata, calculateRuleBasedEsi, type EsiTriageResult } from '../services/clinicalAiService';
 
 interface PrescribedMedItem {
@@ -260,6 +263,62 @@ export default function DoctorDashboard() {
     setTimeout(() => setStatusMessage(''), 4000);
 
     resetDocUploadForm();
+  };
+
+  // Doctor Clinical Voice Dictation State (Groq Whisper v3)
+  const [docVoiceState, setDocVoiceState] = useState<VoiceState>('idle');
+  const docVoiceSessionRef = useRef<UnifiedVoiceSession | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (docVoiceSessionRef.current) {
+        docVoiceSessionRef.current.cancel();
+      }
+    };
+  }, []);
+
+  const toggleDoctorNotesVoice = () => {
+    if (docVoiceState !== 'idle') {
+      if (docVoiceSessionRef.current) {
+        docVoiceSessionRef.current.stop();
+      }
+      return;
+    }
+
+    if (docVoiceSessionRef.current) {
+      docVoiceSessionRef.current.cancel();
+      docVoiceSessionRef.current = null;
+    }
+
+    const session = new UnifiedVoiceSession(
+      {
+        onStateChange: (newState) => {
+          setDocVoiceState(newState);
+        },
+        onResult: (transcript) => {
+          if (transcript && transcript.trim()) {
+            setDoctorNotes((prev) => (prev ? `${prev.trim()}\n${transcript.trim()}` : transcript.trim()));
+            setStatusMessage('🎙️ Voice dictation transcribed & appended to clinical notes.');
+            setTimeout(() => setStatusMessage(''), 3000);
+          }
+          setDocVoiceState('idle');
+        },
+        onError: (err) => {
+          console.warn('Doctor voice dictation error:', err);
+          setDocVoiceState('idle');
+        }
+      },
+      {
+        language: 'en',
+        prompt:
+          'Doctor clinical impressions, differential diagnosis, and patient advice: ' +
+          'Advise complete bed rest, low salt diet, tab Pantoprazole 40mg before breakfast, ' +
+          'follow-up after 1 week with repeat ECG and lipid profile, avoid strenuous physical exertion.'
+      }
+    );
+
+    docVoiceSessionRef.current = session;
+    session.start();
   };
 
   // Apply ESI immediate orders to clinical notes and prescription
@@ -2294,14 +2353,45 @@ export default function DoctorDashboard() {
 
                     {/* Doctor Clinical Notes / Advice */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700 block">
-                        Doctor Clinical Impressions & Patient Advice:
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700 block">
+                          Doctor Clinical Impressions & Patient Advice:
+                        </label>
+                        <button
+                          type="button"
+                          onClick={toggleDoctorNotesVoice}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all shadow-xs cursor-pointer ${
+                            docVoiceState === 'recording'
+                              ? 'bg-red-600 text-white animate-pulse'
+                              : docVoiceState === 'transcribing'
+                              ? 'bg-amber-600 text-white'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                          }`}
+                          title="Speak to dictate notes using Groq Whisper Large-v3"
+                        >
+                          {docVoiceState === 'recording' ? (
+                            <>
+                              <MicOff size={13} />
+                              <span>Listening... (Tap to Stop)</span>
+                            </>
+                          ) : docVoiceState === 'transcribing' ? (
+                            <>
+                              <Sparkles size={13} className="animate-spin" />
+                              <span>Transcribing via Whisper...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Mic size={13} className="text-teal-600" />
+                              <span>Dictate Notes (Whisper)</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                       <textarea
                         rows={3}
                         value={doctorNotes}
                         onChange={(e) => setDoctorNotes(e.target.value)}
-                        placeholder="Type clinical advice, dietary modifications, follow-up instructions..."
+                        placeholder="Type or dictate clinical advice, dietary modifications, follow-up instructions..."
                         className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-teal-500/20 outline-none leading-relaxed"
                       />
                     </div>

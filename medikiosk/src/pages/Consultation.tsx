@@ -20,7 +20,8 @@ import {
   GI_OPTIONS
 } from '../data/clinicalProtocols';
 import { AYURVEDA_QUESTION_TREE, getStartingQuestionId } from '../data/ayurvedicProtocols';
-import { speakPrompt, createSpeechRecognizer } from '../utils/speechVoice';
+import { speakPrompt } from '../utils/speechVoice';
+import { UnifiedVoiceSession, type VoiceState, isGroqWhisperAvailable } from '../services/whisperService';
 import {
   detectClinicalDomain,
   calculateEsiTriage,
@@ -44,10 +45,11 @@ export default function Consultation() {
   // Unified single-question Typeform step index
   const [currentStep, setCurrentStep] = useState(0);
 
-  // Voice recording state
-  const [isListening, setIsListening] = useState(false);
+  // Voice recording state powered by Groq Whisper with Web Speech fallback
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const isListening = voiceState === 'recording';
   const [activeVoiceField, setActiveVoiceField] = useState<string | null>(null);
-  const recognizerRef = useRef<any>(null);
+  const voiceSessionRef = useRef<UnifiedVoiceSession | null>(null);
 
   // Form states
   const [chiefComplaintText, setChiefComplaintText] = useState(currentPatient.chiefComplaint || '');
@@ -248,37 +250,62 @@ export default function Consultation() {
     }
   }, [currentStep, soundEnabled, isHindi, isAyush, clinicalDomain, currentPatient.language, activeAyushQuestionId, ayushCompleted]);
 
-  // Voice recording toggle for any field
+  // Cleanup active voice recording on component unmount
+  useEffect(() => {
+    return () => {
+      if (voiceSessionRef.current) {
+        voiceSessionRef.current.cancel();
+      }
+    };
+  }, []);
+
+  // Voice recording toggle using Unified Voice Session (Groq Whisper v3 + Web Speech fallback)
   const toggleVoice = (fieldName: string, setter: (val: string) => void) => {
-    if (isListening && activeVoiceField === fieldName) {
-      if (recognizerRef.current) recognizerRef.current.stop();
-      setIsListening(false);
-      setActiveVoiceField(null);
+    if (voiceState !== 'idle' && activeVoiceField === fieldName) {
+      if (voiceSessionRef.current) {
+        voiceSessionRef.current.stop();
+      }
       return;
     }
 
-    setActiveVoiceField(fieldName);
-    const recognizer = createSpeechRecognizer(currentPatient.language, {
-      onResult: (transcript) => {
-        setter(transcript);
-        setIsListening(false);
-        setActiveVoiceField(null);
-      },
-      onError: () => {
-        setIsListening(false);
-        setActiveVoiceField(null);
-      },
-      onEnd: () => {
-        setIsListening(false);
-        setActiveVoiceField(null);
-      },
-    });
-
-    if (recognizer) {
-      recognizerRef.current = recognizer;
-      recognizer.start();
-      setIsListening(true);
+    if (voiceSessionRef.current) {
+      voiceSessionRef.current.cancel();
+      voiceSessionRef.current = null;
     }
+
+    setActiveVoiceField(fieldName);
+
+    const session = new UnifiedVoiceSession(
+      {
+        onStateChange: (newState) => {
+          setVoiceState(newState);
+          if (newState === 'idle') {
+            setActiveVoiceField(null);
+          }
+        },
+        onResult: (transcript) => {
+          if (transcript && transcript.trim()) {
+            setter(transcript.trim());
+          }
+          setVoiceState('idle');
+          setActiveVoiceField(null);
+        },
+        onError: (err) => {
+          console.warn('Voice intake error:', err);
+          setVoiceState('idle');
+          setActiveVoiceField(null);
+        }
+      },
+      {
+        language: currentPatient.language,
+        prompt: isHindi
+          ? 'रोगी के स्वास्थ्य लक्षण: छाती में दर्द, बुखार, उल्टी, चक्कर, घबराहट, सांस फूलना, एसिडिटी, कमजोरी, खांसी, दस्त, सिरदर्द।'
+          : 'Patient medical symptoms: chest pain, fever, chills, vomiting, nausea, acidity, shortness of breath, palpitations, weakness, cough, diarrhea, headache.'
+      }
+    );
+
+    voiceSessionRef.current = session;
+    session.start();
   };
 
   // Handle adaptive option selection with red flag tracking
@@ -464,21 +491,55 @@ export default function Consultation() {
               <button
                 type="button"
                 onClick={() => toggleVoice('chiefComplaint', setChiefComplaintText)}
-                className={`absolute right-3 bottom-3 p-2.5 rounded-lg transition-colors ${
-                  isListening && activeVoiceField === 'chiefComplaint'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-slate-900 hover:bg-slate-800 text-white shadow-xs'
+                className={`absolute right-3 bottom-3 p-2.5 rounded-lg transition-all ${
+                  voiceState === 'recording' && activeVoiceField === 'chiefComplaint'
+                    ? 'bg-red-600 text-white animate-pulse shadow-md'
+                    : voiceState === 'transcribing' && activeVoiceField === 'chiefComplaint'
+                    ? 'bg-amber-600 text-white shadow-md'
+                    : 'bg-slate-900 hover:bg-slate-800 text-white shadow-xs cursor-pointer'
                 }`}
-                title={isListening ? 'Stop Listening' : 'Speak to Type'}
+                title={
+                  voiceState === 'recording'
+                    ? 'Tap to Transcribe with Whisper'
+                    : voiceState === 'transcribing'
+                    ? 'Transcribing with Whisper...'
+                    : 'Speak using Groq Whisper'
+                }
               >
-                {isListening && activeVoiceField === 'chiefComplaint' ? <MicOff size={17} /> : <Mic size={17} />}
+                {voiceState === 'recording' && activeVoiceField === 'chiefComplaint' ? (
+                  <MicOff size={17} />
+                ) : voiceState === 'transcribing' && activeVoiceField === 'chiefComplaint' ? (
+                  <Sparkles size={17} className="animate-spin" />
+                ) : (
+                  <Mic size={17} />
+                )}
               </button>
             </div>
 
-            {isListening && activeVoiceField === 'chiefComplaint' && (
-              <div className="text-xs font-semibold text-red-600 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-                <span>{isHindi ? 'रिकॉर्डिंग चालू है... बोलें' : 'Listening... speak clearly'}</span>
+            {/* Voice Status Indicator */}
+            {activeVoiceField === 'chiefComplaint' && (
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs px-1">
+                {voiceState === 'recording' && (
+                  <div className="text-xs font-semibold text-red-600 flex items-center gap-1.5 animate-pulse">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
+                    <span>
+                      {isHindi
+                        ? 'माइक चालू है... अपने लक्षण बोलें (बोलना खत्म होने पर दोबारा दबाएं)'
+                        : 'Listening... speak symptoms in Hindi, English or Hinglish (tap mic when done)'}
+                    </span>
+                  </div>
+                )}
+                {voiceState === 'transcribing' && (
+                  <div className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-amber-600 animate-spin" />
+                    <span>
+                      {isHindi ? 'Whisper v3 से विश्लेषण हो रहा है...' : 'Transcribing via Groq Whisper v3...'}
+                    </span>
+                  </div>
+                )}
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {isGroqWhisperAvailable() ? '⚡ Groq Whisper Large-v3' : '🎙️ Multi-lingual Speech Engine'}
+                </span>
               </div>
             )}
 
