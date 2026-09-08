@@ -147,6 +147,7 @@ export interface PatientData {
   consentHistory: boolean;
   consentDocuments: boolean;
   consentAyush: boolean;
+  enableIntegrativeExam?: boolean;
   structuredSummary: StructuredSummary;
   doctorNotes: string;
   primaryDiagnosis?: string;

@@ -202,16 +202,73 @@ export default function DoctorDashboard() {
     }
   };
 
+  // Integrative 10-Fold & 8-Point Physical Exam Enable/Disable logic:
+  // Default: ENABLED for AYUSH (Ayurveda) patients, DISABLED for Allopath patients.
+  // Doctor can toggle enable/disable on any patient anytime.
+  const isIntegrativeEnabled = selectedPatient.enableIntegrativeExam !== undefined
+    ? selectedPatient.enableIntegrativeExam
+    : selectedPatient.mode === 'ayush';
+
+  const handleToggleIntegrativeExam = (enabled: boolean) => {
+    const updated: PatientData = {
+      ...selectedPatient,
+      enableIntegrativeExam: enabled
+    };
+    setSelectedPatient(updated);
+    if (mockDatabase[updated.token]) {
+      mockDatabase[updated.token] = updated;
+    }
+    syncPatientToSupabase(updated);
+    if (!enabled && activeChartTab === 'ayush') {
+      setActiveChartTab('soap');
+    }
+    setStatusMessage(
+      enabled
+        ? '🌿 10-Fold & 8-Point Integrative Pariksha enabled for this patient.'
+        : '🩺 10-Fold Pariksha disabled. Standard Allopathic clinical chart active.'
+    );
+    setTimeout(() => setStatusMessage(''), 3500);
+  };
+
+  // Helper functions to pre-fill patient self-reported intake (stomach movement, appetite, lifestyle)
+  const getPreFilledAshtaSthana = (p: PatientData): Partial<AshtaSthanaData> => {
+    const existing = p.ashtaSthana || {};
+    return {
+      ...existing,
+      // Stomach movement / bowel habit prefilled from patient intake!
+      mala: existing.mala || (p.koshtha ? `Patient-reported: ${p.koshtha}` : '')
+    };
+  };
+
+  const getPreFilledDashavidha = (p: PatientData): Partial<DashavidhaData> => {
+    const existing = p.dashavidha || {};
+    return {
+      ...existing,
+      prakriti: existing.prakriti || p.prakriti || (p.mode === 'ayush' ? 'Vata-Pitta Tendency' : ''),
+      // Digestive fire & appetite prefilled from patient intake!
+      aharaShakti: existing.aharaShakti || (p.agni ? `Patient-reported: ${p.agni}` : ''),
+      satmya: existing.satmya || (p.aharaVihara ? `Patient-reported: ${p.aharaVihara}` : ''),
+      vaya: existing.vaya || (p.age ? `${p.age} Yrs (${parseInt(p.age) > 60 ? 'Vriddha' : parseInt(p.age) < 18 ? 'Balya' : 'Madhyama Vaya'})` : '')
+    };
+  };
+
   // Doctor / Nurse Bedside Physical Examination State (Dashavidha & Ashta Sthana)
   const [isEditingIntegrativeExam, setIsEditingIntegrativeExam] = useState(false);
-  const [examDashavidha, setExamDashavidha] = useState<Partial<DashavidhaData>>(selectedPatient.dashavidha || {});
-  const [examAshtaSthana, setExamAshtaSthana] = useState<Partial<AshtaSthanaData>>(selectedPatient.ashtaSthana || {});
+  const [examDashavidha, setExamDashavidha] = useState<Partial<DashavidhaData>>(getPreFilledDashavidha(selectedPatient));
+  const [examAshtaSthana, setExamAshtaSthana] = useState<Partial<AshtaSthanaData>>(getPreFilledAshtaSthana(selectedPatient));
 
   useEffect(() => {
-    setExamDashavidha(selectedPatient.dashavidha || {});
-    setExamAshtaSthana(selectedPatient.ashtaSthana || {});
+    setExamDashavidha(getPreFilledDashavidha(selectedPatient));
+    setExamAshtaSthana(getPreFilledAshtaSthana(selectedPatient));
     setIsEditingIntegrativeExam(false);
-  }, [selectedPatient.token]);
+  }, [
+    selectedPatient.token,
+    selectedPatient.koshtha,
+    selectedPatient.agni,
+    selectedPatient.prakriti,
+    selectedPatient.aharaVihara,
+    selectedPatient.age
+  ]);
 
   const isExamDocumented = Boolean(selectedPatient.ashtaSthana?.nadi || selectedPatient.dashavidha?.sara);
 
@@ -1955,22 +2012,34 @@ export default function DoctorDashboard() {
                   <span>OCR Document Scans & Labs ({selectedPatient.uploadedDocuments.length})</span>
                 </button>
 
-                <button
-                  onClick={() => setActiveChartTab('ayush')}
-                  className={`py-3 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
-                    activeChartTab === 'ayush'
-                      ? 'border-emerald-700 text-emerald-800 bg-white shadow-2xs'
-                      : 'border-transparent text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <Stethoscope size={15} className="text-emerald-600" />
-                  <span>Bedside Physical Exam (10-Fold & 8-Point)</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                    isExamDocumented ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
-                  }`}>
-                    {isExamDocumented ? 'Verified' : 'Pending'}
-                  </span>
-                </button>
+                {isIntegrativeEnabled ? (
+                  <button
+                    onClick={() => setActiveChartTab('ayush')}
+                    className={`py-3 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+                      activeChartTab === 'ayush'
+                        ? 'border-emerald-700 text-emerald-800 bg-white shadow-2xs'
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Stethoscope size={15} className="text-emerald-600" />
+                    <span>Bedside Physical Exam (10-Fold & 8-Point)</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                      isExamDocumented ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    }`}>
+                      {isExamDocumented ? 'Verified' : 'Pending'}
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleIntegrativeExam(true)}
+                    className="py-3 px-3 text-xs font-semibold text-slate-400 hover:text-emerald-700 border-b-2 border-transparent transition-all flex items-center gap-1.5 opacity-80 hover:opacity-100 cursor-pointer"
+                    title="Enable 10-Fold Systemic Constitution & 8-Point Bedside Pariksha for this Allopath patient"
+                  >
+                    <Plus size={13} className="text-emerald-600" />
+                    <span>+ Enable 10-Fold Exam</span>
+                  </button>
+                )}
 
 
                 <button
@@ -2169,103 +2238,198 @@ export default function DoctorDashboard() {
                     </div>
 
                     {/* Bedside Physical Examination & Constitutional Matrix (10-Fold & 8-Point) */}
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Stethoscope size={16} className="text-emerald-700" />
-                          <span className="text-xs font-black uppercase tracking-wider text-slate-900">
-                            Bedside Physical & Systemic Examination (Dashavidha & Ashta Sthana)
-                          </span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            isExamDocumented 
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
-                              : 'bg-amber-100 text-amber-800 border border-amber-300'
-                          }`}>
-                            {isExamDocumented ? '✓ Clinician Exam on File' : '⚠️ Pending Bedside Examination'}
-                          </span>
+                    {!isIntegrativeEnabled ? (
+                      <div className="p-3.5 rounded-xl bg-slate-50/90 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center shrink-0">
+                            <Stethoscope size={16} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-slate-800">
+                                10-Fold Systemic Constitution & 8-Point Bedside Pariksha
+                              </span>
+                              <span className="text-[10px] font-semibold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
+                                Disabled (Allopathic Standard)
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              Ayurvedic 10-Fold / 8-Point Pariksha is off by default for Allopathy consultations. Doctor can enable it anytime.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleIntegrativeExam(true)}
+                          className="px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs"
+                        >
+                          <Plus size={13} />
+                          <span>+ Enable 10-Fold Exam</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Stethoscope size={16} className="text-emerald-700" />
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-900">
+                              Bedside Physical & Systemic Examination (Dashavidha & Ashta Sthana)
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isExamDocumented 
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                                : 'bg-amber-100 text-amber-800 border border-amber-300'
+                            }`}>
+                              {isExamDocumented ? '✓ Clinician Exam on File' : '⚠️ Pending Bedside Examination'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveChartTab('ayush');
+                                setIsEditingIntegrativeExam(true);
+                              }}
+                              className="px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-100/70 hover:bg-emerald-200 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                              <Edit3 size={12} />
+                              <span>{isExamDocumented ? 'Edit / Re-Examine' : 'Record Bedside Findings'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleAppendIntegrativeExamToNotes}
+                              className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                              title="Append findings to clinical impressions note"
+                            >
+                              <Sparkles size={12} className="text-emerald-600" />
+                              <span>Append to Notes</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleIntegrativeExam(false)}
+                              className="px-2 py-1 text-xs font-semibold text-slate-500 hover:text-red-700 bg-white hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                              title="Disable 10-fold examination for this patient"
+                            >
+                              <X size={12} />
+                              <span>Disable</span>
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveChartTab('ayush');
-                              setIsEditingIntegrativeExam(true);
-                            }}
-                            className="px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-100/70 hover:bg-emerald-200 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                          >
-                            <Edit3 size={12} />
-                            <span>{isExamDocumented ? 'Edit / Re-Examine' : 'Record Bedside Findings'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleAppendIntegrativeExamToNotes}
-                            className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                            title="Append findings to clinical impressions note"
-                          >
-                            <Sparkles size={12} className="text-emerald-600" />
-                            <span>Append to Notes</span>
-                          </button>
+                        {/* Cleanly Divided Matrix: Clinician Bedside vs Patient Prefilled Intake */}
+                        <div className="space-y-2.5">
+                          {/* Row 1: 🩺 Bedside Physical Signs (Examined by Clinician) */}
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                              🩺 Clinician Bedside Palpation & Inspection
+                            </span>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                              <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                                <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
+                                  Pulse (Nadi)
+                                </span>
+                                <span className={`font-bold text-xs ${selectedPatient.ashtaSthana?.nadi ? 'text-slate-900' : 'text-amber-700 italic'}`}>
+                                  {selectedPatient.ashtaSthana?.nadi || 'Pending Palpation'}
+                                </span>
+                              </div>
+
+                              <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                                <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
+                                  Tongue (Jihwa)
+                                </span>
+                                <span className={`font-bold text-xs ${selectedPatient.ashtaSthana?.jihwa ? 'text-slate-900' : 'text-amber-700 italic'}`}>
+                                  {selectedPatient.ashtaSthana?.jihwa || 'Pending Inspection'}
+                                </span>
+                              </div>
+
+                              <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                                <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
+                                  Skin & Temp (Sparsha)
+                                </span>
+                                <span className={`font-bold text-xs ${selectedPatient.ashtaSthana?.sparsha ? 'text-slate-900' : 'text-amber-700 italic'}`}>
+                                  {selectedPatient.ashtaSthana?.sparsha || 'Pending Bedside Exam'}
+                                </span>
+                              </div>
+
+                              <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
+                                <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
+                                  Tissue Vitality (Sara)
+                                </span>
+                                <span className={`font-bold text-xs ${selectedPatient.dashavidha?.sara ? 'text-slate-900' : 'text-amber-700 italic'}`}>
+                                  {selectedPatient.dashavidha?.sara || 'Pending Assessment'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Row 2: 👤 Pre-filled Functional Intake (Stomach Movement, Digestion, Habits) */}
+                          <div className="pt-1.5 border-t border-slate-200/60">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                                👤 Patient Functional Intake (Pre-filled from Kiosk)
+                              </span>
+                              <span className="text-[9px] text-emerald-700 font-semibold bg-emerald-100/60 px-2 py-0.5 rounded-full">
+                                ✓ Auto-synced from Kiosk
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                              {/* Stomach Movement / Bowel Habit (Mala / Koshtha) */}
+                              <div className="p-2.5 bg-emerald-50/40 rounded-lg border border-emerald-200 shadow-2xs">
+                                <span className="text-[10px] text-emerald-800 font-bold block uppercase mb-0.5">
+                                  Stomach Movement (Mala)
+                                </span>
+                                <span className="font-bold text-xs text-slate-900 block truncate" title={selectedPatient.ashtaSthana?.mala || selectedPatient.koshtha || 'Regular Daily'}>
+                                  {selectedPatient.ashtaSthana?.mala || selectedPatient.koshtha || 'Regular Daily'}
+                                </span>
+                                <span className="text-[9px] text-emerald-600 font-medium block">
+                                  {selectedPatient.koshtha ? `Kiosk: ${selectedPatient.koshtha}` : 'Normal Bowel Movement'}
+                                </span>
+                              </div>
+
+                              {/* Digestive Fire & Appetite (Ahara-shakti / Agni) */}
+                              <div className="p-2.5 bg-emerald-50/40 rounded-lg border border-emerald-200 shadow-2xs">
+                                <span className="text-[10px] text-emerald-800 font-bold block uppercase mb-0.5">
+                                  Appetite & Agni
+                                </span>
+                                <span className="font-bold text-xs text-slate-900 block truncate" title={selectedPatient.dashavidha?.aharaShakti || selectedPatient.agni || 'Samagni (Balanced)'}>
+                                  {selectedPatient.dashavidha?.aharaShakti || selectedPatient.agni || 'Samagni (Balanced)'}
+                                </span>
+                                <span className="text-[9px] text-emerald-600 font-medium block">
+                                  {selectedPatient.agni ? `Kiosk: ${selectedPatient.agni}` : 'Normal Digestion'}
+                                </span>
+                              </div>
+
+                              {/* Habituation & Diet (Satmya) */}
+                              <div className="p-2.5 bg-emerald-50/40 rounded-lg border border-emerald-200 shadow-2xs">
+                                <span className="text-[10px] text-emerald-800 font-bold block uppercase mb-0.5">
+                                  Diet & Satmya
+                                </span>
+                                <span className="font-bold text-xs text-slate-900 block truncate" title={selectedPatient.dashavidha?.satmya || selectedPatient.aharaVihara || 'Balanced diet'}>
+                                  {selectedPatient.dashavidha?.satmya || selectedPatient.aharaVihara || 'Sarva-rasa Satmya'}
+                                </span>
+                                <span className="text-[9px] text-emerald-600 font-medium block">
+                                  {selectedPatient.aharaVihara ? 'Reported Dietary Habit' : 'Normal Tolerance'}
+                                </span>
+                              </div>
+
+                              {/* Baseline Constitution / Age (Prakriti / Vaya) */}
+                              <div className="p-2.5 bg-emerald-50/40 rounded-lg border border-emerald-200 shadow-2xs">
+                                <span className="text-[10px] text-emerald-800 font-bold block uppercase mb-0.5">
+                                  Constitution (Prakriti)
+                                </span>
+                                <span className="font-bold text-xs text-slate-900 block truncate" title={selectedPatient.prakriti || selectedPatient.dashavidha?.prakriti || (selectedPatient.mode === 'ayush' ? 'Vata-Pitta' : 'Balanced')}>
+                                  {selectedPatient.prakriti || selectedPatient.dashavidha?.prakriti || (selectedPatient.mode === 'ayush' ? 'Vata-Pitta' : 'Balanced')}
+                                </span>
+                                <span className="text-[9px] text-emerald-600 font-medium block">
+                                  {selectedPatient.age ? `Age: ${selectedPatient.age} Yrs` : 'Self-Identified'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
-
-                      {/* 6-box Clinical Matrix */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
-                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
-                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
-                            Pulse & Arterial Wave (Nadi)
-                          </span>
-                          <span className={`font-bold text-xs ${selectedPatient.ashtaSthana?.nadi ? 'text-slate-900' : 'text-amber-700 italic'}`}>
-                            {selectedPatient.ashtaSthana?.nadi || 'Pending Bedside Palpation'}
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
-                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
-                            Tongue & Oral Mucosa (Jihwa)
-                          </span>
-                          <span className={`font-bold text-xs ${selectedPatient.ashtaSthana?.jihwa ? 'text-slate-900' : 'text-amber-700 italic'}`}>
-                            {selectedPatient.ashtaSthana?.jihwa || 'Pending Oral Inspection'}
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
-                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
-                            Tissue Vitality & Reserve (Sara)
-                          </span>
-                          <span className={`font-bold text-xs ${selectedPatient.dashavidha?.sara ? 'text-slate-900' : 'text-amber-700 italic'}`}>
-                            {selectedPatient.dashavidha?.sara || 'Pending Assessment'}
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
-                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
-                            Musculoskeletal Build (Samhanana)
-                          </span>
-                          <span className={`font-bold text-xs ${selectedPatient.dashavidha?.samhanana ? 'text-slate-900' : 'text-amber-700 italic'}`}>
-                            {selectedPatient.dashavidha?.samhanana || 'Pending Assessment'}
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
-                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
-                            Skin, Moisture & Temp (Sparsha)
-                          </span>
-                          <span className={`font-bold text-xs ${selectedPatient.ashtaSthana?.sparsha ? 'text-slate-900' : 'text-amber-700 italic'}`}>
-                            {selectedPatient.ashtaSthana?.sparsha || 'Pending Bedside Exam'}
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
-                          <span className="text-[10px] text-slate-400 font-bold block uppercase mb-0.5">
-                            Baseline Constitution (Prakriti)
-                          </span>
-                          <span className="font-bold text-xs text-slate-900">
-                            {selectedPatient.prakriti || selectedPatient.dashavidha?.prakriti || (selectedPatient.mode === 'ayush' ? 'Pending Intake' : 'General Metabolic Balance')}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                    )}
 
                     {/* Highlights from Past Reports */}
                     {selectedPatient.uploadedDocuments && selectedPatient.uploadedDocuments.length > 0 ? (
@@ -3110,6 +3274,15 @@ export default function DoctorDashboard() {
                         <Sparkles size={13} />
                         <span>Append to Clinical Notes</span>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleIntegrativeExam(false)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-red-50 border border-slate-300 hover:border-red-300 text-slate-600 hover:text-red-700 rounded-lg text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+                        title="Disable 10-fold examination for this patient and return to standard SOAP note"
+                      >
+                        <X size={13} />
+                        <span>Disable Exam</span>
+                      </button>
                     </div>
                   </div>
 
@@ -3260,8 +3433,13 @@ export default function DoctorDashboard() {
                           </div>
 
                           {/* 3. Mala */}
-                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
-                            <label className="text-[10px] font-bold text-blue-800 uppercase block">3. Bowel (Mala / Koshtha)</label>
+                          <div className={`p-3 bg-white rounded-xl border space-y-1 ${selectedPatient.koshtha ? 'border-emerald-300 bg-emerald-50/15' : 'border-slate-200'}`}>
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-blue-800 uppercase block">3. Bowel & Stomach Movement (Mala)</label>
+                              {selectedPatient.koshtha && (
+                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">✓ Pre-filled</span>
+                              )}
+                            </div>
                             <input
                               type="text"
                               value={examAshtaSthana.mala || ''}
@@ -3269,7 +3447,9 @@ export default function DoctorDashboard() {
                               placeholder="e.g. Constipated & Hard (Krura)"
                               className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
                             />
-                            <span className="text-[9px] text-slate-400 block">Stool frequency & consistency</span>
+                            <span className="text-[9px] text-slate-500 block">
+                              {selectedPatient.koshtha ? `Patient stated at kiosk: "${selectedPatient.koshtha}"` : 'Stool frequency, transit & bowel movement'}
+                            </span>
                           </div>
 
                           {/* 4. Jihwa */}
@@ -3352,8 +3532,13 @@ export default function DoctorDashboard() {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                           {/* 1. Prakriti */}
-                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
-                            <label className="text-[10px] font-bold text-emerald-800 uppercase block">1. Baseline Constitution (Prakriti)</label>
+                          <div className={`p-3 bg-white rounded-xl border space-y-1 ${selectedPatient.prakriti ? 'border-emerald-300 bg-emerald-50/15' : 'border-slate-200'}`}>
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-emerald-800 uppercase block">1. Baseline Constitution (Prakriti)</label>
+                              {selectedPatient.prakriti && (
+                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">✓ Pre-filled</span>
+                              )}
+                            </div>
                             <input
                               type="text"
                               value={examDashavidha.prakriti || ''}
@@ -3361,7 +3546,9 @@ export default function DoctorDashboard() {
                               placeholder="e.g. Vata-Pitta Combination"
                               className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-emerald-500 outline-none"
                             />
-                            <span className="text-[9px] text-slate-400 block">Baseline genotype & doshic balance</span>
+                            <span className="text-[9px] text-slate-500 block">
+                              {selectedPatient.prakriti ? `Pre-filled from kiosk intake: "${selectedPatient.prakriti}"` : 'Baseline genotype & doshic balance'}
+                            </span>
                           </div>
 
                           {/* 2. Vikriti */}
@@ -3417,8 +3604,13 @@ export default function DoctorDashboard() {
                           </div>
 
                           {/* 6. Satmya */}
-                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
-                            <label className="text-[10px] font-bold text-slate-700 uppercase block">6. Adaptability & Habituation (Satmya)</label>
+                          <div className={`p-3 bg-white rounded-xl border space-y-1 ${selectedPatient.aharaVihara ? 'border-emerald-300 bg-emerald-50/15' : 'border-slate-200'}`}>
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-slate-700 uppercase block">6. Adaptability & Habituation (Satmya)</label>
+                              {selectedPatient.aharaVihara && (
+                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">✓ Pre-filled</span>
+                              )}
+                            </div>
                             <input
                               type="text"
                               value={examDashavidha.satmya || ''}
@@ -3426,7 +3618,9 @@ export default function DoctorDashboard() {
                               placeholder="e.g. Moderate Adaptability (Sensitive to spicy foods)"
                               className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
                             />
-                            <span className="text-[9px] text-slate-400 block">Tolerance to dietary changes & climate</span>
+                            <span className="text-[9px] text-slate-500 block">
+                              {selectedPatient.aharaVihara ? `Diet/lifestyle reported at kiosk: "${selectedPatient.aharaVihara}"` : 'Tolerance to dietary changes & climate'}
+                            </span>
                           </div>
 
                           {/* 7. Sattva */}
@@ -3443,8 +3637,13 @@ export default function DoctorDashboard() {
                           </div>
 
                           {/* 8. Ahara-shakti */}
-                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
-                            <label className="text-[10px] font-bold text-amber-800 uppercase block">8. Metabolic Power (Ahara-shakti / Agni)</label>
+                          <div className={`p-3 bg-white rounded-xl border space-y-1 ${selectedPatient.agni ? 'border-emerald-300 bg-emerald-50/15' : 'border-slate-200'}`}>
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-amber-800 uppercase block">8. Metabolic Power (Ahara-shakti / Agni)</label>
+                              {selectedPatient.agni && (
+                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">✓ Pre-filled</span>
+                              )}
+                            </div>
                             <input
                               type="text"
                               value={examDashavidha.aharaShakti || ''}
@@ -3452,7 +3651,9 @@ export default function DoctorDashboard() {
                               placeholder="e.g. Tikshnagni / Samagni / Mandagni"
                               className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-amber-500 outline-none"
                             />
-                            <span className="text-[9px] text-slate-400 block">Digestive fire & assimilation capacity</span>
+                            <span className="text-[9px] text-slate-500 block">
+                              {selectedPatient.agni ? `Appetite reported at kiosk: "${selectedPatient.agni}"` : 'Digestive fire & assimilation capacity'}
+                            </span>
                           </div>
 
                           {/* 9. Vyayama-shakti */}
@@ -3469,8 +3670,13 @@ export default function DoctorDashboard() {
                           </div>
 
                           {/* 10. Vaya */}
-                          <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
-                            <label className="text-[10px] font-bold text-slate-700 uppercase block">10. Biological Age Stage (Vaya)</label>
+                          <div className={`p-3 bg-white rounded-xl border space-y-1 ${selectedPatient.age ? 'border-emerald-300 bg-emerald-50/15' : 'border-slate-200'}`}>
+                            <div className="flex items-center justify-between">
+                              <label className="text-[10px] font-bold text-slate-700 uppercase block">10. Biological Age Stage (Vaya)</label>
+                              {selectedPatient.age && (
+                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">✓ Pre-filled</span>
+                              )}
+                            </div>
                             <input
                               type="text"
                               value={examDashavidha.vaya || ''}
@@ -3478,7 +3684,9 @@ export default function DoctorDashboard() {
                               placeholder="e.g. Madhyama Phase (Adult Productive)"
                               className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:border-blue-500 outline-none"
                             />
-                            <span className="text-[9px] text-slate-400 block">Developmental physiological phase</span>
+                            <span className="text-[9px] text-slate-500 block">
+                              {selectedPatient.age ? `Calculated from patient age: ${selectedPatient.age} Yrs` : 'Developmental physiological phase'}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -3608,12 +3816,14 @@ export default function DoctorDashboard() {
                       <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-bold text-slate-500 uppercase">6. Environmental & Food Adaptability (Satmya)</span>
-                          <span className="text-[9px] font-mono bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">Tolerance</span>
+                          {selectedPatient.aharaVihara && (
+                            <span className="text-[9px] font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">✓ Pre-filled</span>
+                          )}
                         </div>
                         <span className="text-sm font-black text-slate-900 block">
-                          {selectedPatient.dashavidha?.satmya || (
+                          {selectedPatient.dashavidha?.satmya || (selectedPatient.aharaVihara ? `Patient-reported: ${selectedPatient.aharaVihara}` : (
                             <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
-                          )}
+                          ))}
                         </span>
                         <p className="text-[11px] text-slate-500 leading-relaxed">
                           Habituation to diverse dietary items, weather extremes, and seasonal shifts.
@@ -3640,12 +3850,14 @@ export default function DoctorDashboard() {
                       <div className="p-3.5 bg-amber-50/40 rounded-xl border border-amber-200/80 space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-bold text-amber-800 uppercase">8. Metabolic & Digestive Power (Ahara-shakti / Agni)</span>
-                          <span className="text-[9px] font-mono bg-amber-100/70 text-amber-900 px-1.5 py-0.5 rounded font-bold">Metabolic</span>
+                          {selectedPatient.agni && (
+                            <span className="text-[9px] font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">✓ Pre-filled</span>
+                          )}
                         </div>
                         <span className="text-sm font-black text-amber-950 block">
-                          {selectedPatient.dashavidha?.aharaShakti || selectedPatient.agni || (
+                          {selectedPatient.dashavidha?.aharaShakti || (selectedPatient.agni ? `Patient-reported: ${selectedPatient.agni}` : (
                             <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
-                          )}
+                          ))}
                         </span>
                         <p className="text-[11px] text-amber-800 leading-relaxed">
                           Digestive fire strength (Abhyavaharana shakti) and post-prandial assimilation (Jarana shakti).
@@ -3672,10 +3884,12 @@ export default function DoctorDashboard() {
                       <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-bold text-slate-500 uppercase">10. Biological Age Stage (Vaya)</span>
-                          <span className="text-[9px] font-mono bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">Phase</span>
+                          {selectedPatient.age && (
+                            <span className="text-[9px] font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">✓ Pre-filled</span>
+                          )}
                         </div>
                         <span className="text-sm font-black text-slate-900 block">
-                          {selectedPatient.dashavidha?.vaya || (selectedPatient.age ? `${selectedPatient.age} Yrs - Adult Phase` : (
+                          {selectedPatient.dashavidha?.vaya || (selectedPatient.age ? `${selectedPatient.age} Yrs (${parseInt(selectedPatient.age) > 60 ? 'Vriddha' : parseInt(selectedPatient.age) < 18 ? 'Balya' : 'Madhyama Vaya'})` : (
                             <span className="text-slate-400 font-normal italic">Pending Bedside Clinician Exam</span>
                           ))}
                         </span>
@@ -3724,14 +3938,21 @@ export default function DoctorDashboard() {
                       </div>
 
                       {/* Mala */}
-                      <div className="p-3 bg-white rounded-xl border border-blue-200/90 shadow-2xs space-y-1">
-                        <span className="text-[10px] font-bold text-blue-800 uppercase block">3. Bowel (Mala / Koshtha)</span>
-                        <span className="font-extrabold text-slate-900 block">
-                          {selectedPatient.ashtaSthana?.mala || selectedPatient.koshtha || (
-                            <span className="text-amber-700/80 font-normal italic text-xs">Bedside Exam Pending</span>
+                      <div className={`p-3 bg-white rounded-xl border shadow-2xs space-y-1 ${selectedPatient.koshtha ? 'border-emerald-300/90 bg-emerald-50/10' : 'border-blue-200/90'}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-blue-800 uppercase block">3. Bowel (Mala / Koshtha)</span>
+                          {selectedPatient.koshtha && (
+                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded">✓ Pre-filled</span>
                           )}
+                        </div>
+                        <span className="font-extrabold text-slate-900 block">
+                          {selectedPatient.ashtaSthana?.mala || (selectedPatient.koshtha ? `Patient-reported: ${selectedPatient.koshtha}` : (
+                            <span className="text-amber-700/80 font-normal italic text-xs">Bedside Exam Pending</span>
+                          ))}
                         </span>
-                        <span className="text-[10px] text-slate-500 block">Stool consistency & regularity</span>
+                        <span className="text-[10px] text-emerald-700 block">
+                          {selectedPatient.koshtha ? `Kiosk Bowel Habit: ${selectedPatient.koshtha}` : 'Stool consistency & regularity'}
+                        </span>
                       </div>
 
                       {/* Jihwa */}
