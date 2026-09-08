@@ -60,7 +60,7 @@ export default function DoctorDashboard() {
   const [doctorNotes, setDoctorNotes] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
-  const [queueFilter, setQueueFilter] = useState<'all' | 'emergency' | 'ayush' | 'waiting'>('all');
+  const [queueFilter, setQueueFilter] = useState<'all' | 'emergency' | 'ayush' | 'waiting' | 'relieved'>('all');
 
   // Feature 4D: Automated Emergency Severity Index (ESI) Triage State
   const [showEsiOverride, setShowEsiOverride] = useState(false);
@@ -225,13 +225,27 @@ export default function DoctorDashboard() {
   };
 
   const handleSaveToHIS = () => {
-    selectedPatient.status = 'accepted';
-    selectedPatient.doctorNotes = doctorNotes;
-    if (mockDatabase[selectedPatient.token]) {
-      mockDatabase[selectedPatient.token] = { ...selectedPatient };
+    const updated: PatientData = {
+      ...selectedPatient,
+      status: 'accepted',
+      doctorNotes
+    };
+    if (mockDatabase[updated.token]) {
+      mockDatabase[updated.token] = updated;
     }
-    syncToProfileVisit(selectedPatient, prescribedMeds, doctorNotes, '(Discharged/Outpatient)');
-    setStatusMessage(`✅ Intake verified & pushed to Hospital Information System (HIS).`);
+    syncToProfileVisit(updated, prescribedMeds, doctorNotes, '(Discharged/Outpatient)');
+    syncPatientToSupabase(updated);
+    usePatientStore.getState().triggerQueueUpdate();
+
+    // Automatically advance to the next active patient in queue
+    const remainingActive = Object.values(mockDatabase).filter(
+      p => p.token !== updated.token && p.status !== 'accepted' && p.status !== 'admitted'
+    );
+    if (remainingActive.length > 0) {
+      handleSelectPatient(remainingActive[0]);
+    }
+
+    setStatusMessage(`Patient ${updated.name} (Token: ${updated.token}) marked OPD Done & Relieved.`);
     setTimeout(() => setStatusMessage(''), 3500);
   };
 
@@ -370,11 +384,15 @@ export default function DoctorDashboard() {
   };
 
   const allQueuePatients = Object.values(mockDatabase);
+  const activeQueuePatients = allQueuePatients.filter((p) => p.status !== 'accepted' && p.status !== 'admitted');
+  const relievedPatients = allQueuePatients.filter((p) => p.status === 'accepted');
+
   const filteredQueue = allQueuePatients.filter((p) => {
-    if (queueFilter === 'emergency') return p.triageLevel === 'emergency';
-    if (queueFilter === 'ayush') return p.mode === 'ayush';
+    if (queueFilter === 'emergency') return p.triageLevel === 'emergency' && p.status !== 'accepted';
+    if (queueFilter === 'ayush') return p.mode === 'ayush' && p.status !== 'accepted';
     if (queueFilter === 'waiting') return p.status === 'waiting';
-    return true;
+    if (queueFilter === 'relieved') return p.status === 'accepted';
+    return p.status !== 'accepted';
   });
 
   const handleMarkDoseGiven = (patient: PatientData, medId: string) => {
@@ -483,12 +501,7 @@ export default function DoctorDashboard() {
       )}
 
       {/* OPD KPI Ticker Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Registered</div>
-          <div className="text-xl font-black text-slate-900 mt-0.5">14 <span className="text-[11px] font-normal text-slate-400">Patients</span></div>
-        </div>
-
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">In Waiting Hall</div>
           <div className="text-xl font-black text-blue-600 mt-0.5">{allQueuePatients.filter(p => p.status === 'waiting').length} <span className="text-[11px] font-normal text-slate-400">Waiting</span></div>
@@ -499,13 +512,18 @@ export default function DoctorDashboard() {
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> Critical Red-Flags
           </div>
           <div className="text-xl font-black text-red-600 mt-0.5">
-            {allQueuePatients.filter(p => p.triageLevel === 'emergency').length} <span className="text-[11px] font-normal text-slate-400">High Risk</span>
+            {activeQueuePatients.filter(p => p.triageLevel === 'emergency').length} <span className="text-[11px] font-normal text-slate-400">High Risk</span>
           </div>
         </div>
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Avg Consult Duration</div>
-          <div className="text-xl font-black text-emerald-600 mt-0.5">2.8 <span className="text-[11px] font-normal text-slate-400">min (was 15m)</span></div>
+          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">In Ward / IPD</div>
+          <div className="text-xl font-black text-amber-600 mt-0.5">{allQueuePatients.filter(p => p.status === 'admitted').length} <span className="text-[11px] font-normal text-slate-400">Admitted</span></div>
+        </div>
+
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">OPD Done / Relieved</div>
+          <div className="text-xl font-black text-emerald-600 mt-0.5">{relievedPatients.length} <span className="text-[11px] font-normal text-slate-400">Relieved</span></div>
         </div>
       </div>
 
@@ -535,39 +553,47 @@ export default function DoctorDashboard() {
               </button>
               
               <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-semibold">
-              <button
-                onClick={() => setQueueFilter('all')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  queueFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
-                }`}
-              >
-                All ({allQueuePatients.length})
-              </button>
-              <button
-                onClick={() => setQueueFilter('emergency')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  queueFilter === 'emergency' ? 'bg-red-600 text-white shadow-2xs' : 'text-red-700'
-                }`}
-              >
-                🚨 Emergency ({allQueuePatients.filter(p => p.triageLevel === 'emergency').length})
-              </button>
-              <button
-                onClick={() => setQueueFilter('ayush')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  queueFilter === 'ayush' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700'
-                }`}
-              >
-                🌿 AYUSH ({allQueuePatients.filter(p => p.mode === 'ayush').length})
-              </button>
-              <button
-                onClick={() => setQueueFilter('waiting')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  queueFilter === 'waiting' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
-                }`}
-              >
-                Waiting ({allQueuePatients.filter(p => p.status === 'waiting').length})
-              </button>
-            </div>
+                <button
+                  onClick={() => setQueueFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    queueFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
+                  }`}
+                >
+                  Active Queue ({activeQueuePatients.length})
+                </button>
+                <button
+                  onClick={() => setQueueFilter('emergency')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    queueFilter === 'emergency' ? 'bg-red-600 text-white shadow-2xs' : 'text-red-700'
+                  }`}
+                >
+                  🚨 Emergency ({activeQueuePatients.filter(p => p.triageLevel === 'emergency').length})
+                </button>
+                <button
+                  onClick={() => setQueueFilter('ayush')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    queueFilter === 'ayush' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700'
+                  }`}
+                >
+                  🌿 AYUSH ({activeQueuePatients.filter(p => p.mode === 'ayush').length})
+                </button>
+                <button
+                  onClick={() => setQueueFilter('waiting')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    queueFilter === 'waiting' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
+                  }`}
+                >
+                  Waiting ({allQueuePatients.filter(p => p.status === 'waiting').length})
+                </button>
+                <button
+                  onClick={() => setQueueFilter('relieved')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    queueFilter === 'relieved' ? 'bg-teal-700 text-white shadow-2xs' : 'text-teal-700'
+                  }`}
+                >
+                  Relieved ({relievedPatients.length})
+                </button>
+              </div>
             </div>
           </div>
 
@@ -678,45 +704,53 @@ export default function DoctorDashboard() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {allQueuePatients.filter(p => p.triageLevel === 'emergency').map((p) => (
-              <div key={p.token} className="p-5 rounded-2xl border-2 border-red-300 bg-red-50/40 space-y-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="font-mono text-xs font-black bg-red-600 text-white px-2.5 py-0.5 rounded">
-                      TOKEN: {p.token}
-                    </span>
-                    <h3 className="font-bold text-base text-slate-900 mt-1">{p.name}</h3>
-                    <p className="text-xs text-slate-600">{p.age} Yrs • {p.gender} • ABHA: {p.abhaId}</p>
-                  </div>
-                  <button
-                    onClick={() => handleSelectPatient(p)}
-                    className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-bold shadow-sm"
-                  >
-                    Open Immediate Chart
-                  </button>
-                </div>
-
-                <div className="p-3 bg-white rounded-xl border border-red-200">
-                  <div className="text-xs font-bold text-red-900">Chief Complaint:</div>
-                  <div className="text-xs font-semibold text-slate-800 mt-0.5">{p.chiefComplaint}</div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="text-xs font-bold text-red-800 uppercase tracking-wider">Red Flag Triages:</div>
-                  {p.redFlags.map((flag, idx) => (
-                    <div key={idx} className="flex items-start gap-2 text-xs text-red-700 font-medium">
-                      <AlertTriangle size={14} className="shrink-0 mt-0.5 text-red-600" />
-                      <span>{flag}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="pt-2 border-t border-red-200 flex items-center justify-between text-xs text-slate-500">
-                  <span>Suggested Action: Immediate 12-Lead ECG & Stat IV Access</span>
-                  <span className="font-bold text-red-700">Code Yellow</span>
-                </div>
+            {activeQueuePatients.filter(p => p.triageLevel === 'emergency').length === 0 ? (
+              <div className="col-span-full py-12 text-center bg-white border border-dashed border-emerald-200 rounded-2xl space-y-2">
+                <ShieldCheck size={32} className="mx-auto text-emerald-600" />
+                <h4 className="font-bold text-slate-800 text-sm">Emergency Bay All Clear</h4>
+                <p className="text-xs text-slate-500">No active high-acuity emergency cases pending triage.</p>
               </div>
-            ))}
+            ) : (
+              activeQueuePatients.filter(p => p.triageLevel === 'emergency').map((p) => (
+                <div key={p.token} className="p-5 rounded-2xl border-2 border-red-300 bg-red-50/40 space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="font-mono text-xs font-black bg-red-600 text-white px-2.5 py-0.5 rounded">
+                        TOKEN: {p.token}
+                      </span>
+                      <h3 className="font-bold text-base text-slate-900 mt-1">{p.name}</h3>
+                      <p className="text-xs text-slate-600">{p.age} Yrs • {p.gender} • ABHA: {p.abhaId}</p>
+                    </div>
+                    <button
+                      onClick={() => handleSelectPatient(p)}
+                      className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-bold shadow-sm"
+                    >
+                      Open Immediate Chart
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-xl border border-red-200">
+                    <div className="text-xs font-bold text-red-900">Chief Complaint:</div>
+                    <div className="text-xs font-semibold text-slate-800 mt-0.5">{p.chiefComplaint}</div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-bold text-red-800 uppercase tracking-wider">Red Flag Triages:</div>
+                    {p.redFlags.map((flag, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-xs text-red-700 font-medium">
+                        <AlertTriangle size={14} className="shrink-0 mt-0.5 text-red-600" />
+                        <span>{flag}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 border-t border-red-200 flex items-center justify-between text-xs text-slate-500">
+                    <span>Suggested Action: Immediate 12-Lead ECG & Stat IV Access</span>
+                    <span className="font-bold text-red-700">Code Yellow</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -1142,7 +1176,7 @@ export default function DoctorDashboard() {
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Corridor Queue</span>
                 <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
-                  {allQueuePatients.length} Total
+                  {activeQueuePatients.length} Active
                 </span>
               </div>
 
@@ -1160,47 +1194,55 @@ export default function DoctorDashboard() {
 
               {/* Patient List Cards */}
               <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                {allQueuePatients.map((p) => {
-                  const isSelected = p.token === selectedPatient.token;
-                  return (
-                    <div
-                      key={p.token}
-                      onClick={() => handleSelectPatient(p)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-teal-50/80 border-teal-500 shadow-2xs'
-                          : 'bg-white border-slate-200/80 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`font-mono text-[11px] font-black px-1.5 py-0.5 rounded ${
-                          isSelected ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-800'
-                        }`}>
-                          {p.token}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {p.esiTriage && (
-                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${p.esiTriage.badgeBg} ${p.esiTriage.badgeText} ${p.esiTriage.badgeBorder}`}>
-                              ESI-{p.esiTriage.level}
-                            </span>
-                          )}
-                          {p.triageLevel === 'emergency' && !p.esiTriage && (
-                            <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full animate-pulse">
-                              EMERGENCY
-                            </span>
-                          )}
-                          {p.mode === 'ayush' && (
-                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">
-                              AYUSH
-                            </span>
-                          )}
+                {activeQueuePatients.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400 space-y-1.5 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    <Check size={18} className="mx-auto text-emerald-600" />
+                    <p className="text-xs font-bold text-slate-700">Queue Clear</p>
+                    <p className="text-[10px] text-slate-400">All registered patients have been relieved.</p>
+                  </div>
+                ) : (
+                  activeQueuePatients.map((p) => {
+                    const isSelected = p.token === selectedPatient.token;
+                    return (
+                      <div
+                        key={p.token}
+                        onClick={() => handleSelectPatient(p)}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-teal-50/80 border-teal-500 shadow-2xs'
+                            : 'bg-white border-slate-200/80 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`font-mono text-[11px] font-black px-1.5 py-0.5 rounded ${
+                            isSelected ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-800'
+                          }`}>
+                            {p.token}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {p.esiTriage && (
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${p.esiTriage.badgeBg} ${p.esiTriage.badgeText} ${p.esiTriage.badgeBorder}`}>
+                                ESI-{p.esiTriage.level}
+                              </span>
+                            )}
+                            {p.triageLevel === 'emergency' && !p.esiTriage && (
+                              <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full animate-pulse">
+                                EMERGENCY
+                              </span>
+                            )}
+                            {p.mode === 'ayush' && (
+                              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                                AYUSH
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        <div className="font-bold text-xs text-slate-900 truncate">{p.name}</div>
+                        <div className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{p.chiefComplaint}</div>
                       </div>
-                      <div className="font-bold text-xs text-slate-900 truncate">{p.name}</div>
-                      <div className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{p.chiefComplaint}</div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
 
             </div>

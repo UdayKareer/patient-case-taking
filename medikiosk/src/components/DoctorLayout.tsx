@@ -108,9 +108,9 @@ export default function DoctorLayout() {
             <div className="h-4 w-px bg-slate-200 hidden sm:block" />
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/60">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                <span>AI Scribe Pre-Elicited</span>
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200/60">
+                <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                <span>EHR Cloud Synced</span>
               </div>
             </div>
           </div>

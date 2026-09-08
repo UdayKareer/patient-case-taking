@@ -7,8 +7,7 @@ import {
   Activity,
   ShieldCheck,
   Building2,
-  Clock,
-  Sparkles
+  Clock
 } from 'lucide-react';
 import { usePatientStore, mockDatabase } from '../store/usePatientStore';
 
@@ -24,9 +23,10 @@ export default function DoctorSidebar({ activeTab, setActiveTab, onLogout }: Doc
   const { currentPatient } = usePatientStore();
 
   const allPatients = Object.values(mockDatabase);
-  const emergencyCount = allPatients.filter((p) => p.triageLevel === 'emergency').length;
-  const waitingCount = allPatients.filter((p) => p.status === 'waiting').length;
-  const ayushCount = allPatients.filter((p) => p.mode === 'ayush').length;
+  const activePatients = allPatients.filter((p) => p.status !== 'accepted');
+  const emergencyCount = activePatients.filter((p) => p.triageLevel === 'emergency' && p.status !== 'admitted').length;
+  const waitingCount = activePatients.filter((p) => p.status === 'waiting').length;
+  const ayushCount = activePatients.filter((p) => p.mode === 'ayush' && p.status !== 'admitted').length;
   const ipdCount = allPatients.filter((p) => p.status === 'admitted').length;
 
   const navItems = [
@@ -104,7 +104,7 @@ export default function DoctorSidebar({ activeTab, setActiveTab, onLogout }: Doc
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-bold text-white truncate">Dr. Arvind Sharma, MD</div>
-            <div className="text-[10px] text-slate-400 truncate">Internal Medicine & Triage</div>
+            <div className="text-[10px] text-slate-400 truncate">Senior Consultant • Internal Medicine</div>
           </div>
         </div>
       </div>
@@ -179,10 +179,8 @@ export default function DoctorSidebar({ activeTab, setActiveTab, onLogout }: Doc
             </span>
           </div>
           <div className="flex items-center justify-between text-[11px]">
-            <span className="text-slate-400">Time Saved / Patient</span>
-            <span className="text-[11px] font-semibold text-teal-300 flex items-center gap-1">
-              <Sparkles size={11} /> 12.2 min
-            </span>
+            <span className="text-slate-400">ABDM Registry Sync</span>
+            <span className="text-[11px] font-semibold text-emerald-400">Verified Active</span>
           </div>
         </div>
 
