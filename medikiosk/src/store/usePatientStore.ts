@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { io } from 'socket.io-client';
+import { supabase } from '../lib/supabase';
 
 const socket = io('https://medikiosk-sih-2026.loca.lt', {
   extraHeaders: {
@@ -913,6 +914,31 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
       }
     }
 
+    // Push to Supabase Cloud Database (if table exists)
+    try {
+      supabase.from('patients').upsert({
+        token: fullPatient.token,
+        patient_id: fullPatient.patientId,
+        abha_id: fullPatient.abhaId,
+        name: fullPatient.name,
+        age: fullPatient.age,
+        gender: fullPatient.gender,
+        phone: fullPatient.phone,
+        chief_complaint: fullPatient.chiefComplaint,
+        triage_level: fullPatient.triageLevel,
+        status: fullPatient.status,
+        admitted_ward: fullPatient.admittedWard,
+        bed_number: fullPatient.bedNumber,
+        admission_date: fullPatient.admissionDate,
+        ipd_stage: fullPatient.ipdStage,
+        data: fullPatient
+      }).then(({ error }) => {
+        if (error) console.warn('Supabase save note:', error.message);
+      });
+    } catch (e) {
+      console.warn('Supabase sync error:', e);
+    }
+
     // Real-time sync to Doctor's Dashboard (50ms latency)
     socket.emit('patient_intake_submitted', fullPatient);
   },
@@ -935,5 +961,62 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
       mockDatabase[data.token] = data;
       get().triggerQueueUpdate();
     });
+
+    // Supabase cloud data initialization
+    try {
+      supabase.from('patients').select('*').then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+          data.forEach((row: any) => {
+            if (row.data && row.token) {
+              mockDatabase[row.token] = row.data;
+            }
+          });
+          get().triggerQueueUpdate();
+        }
+      });
+
+      // Supabase Realtime channel across devices
+      supabase
+        .channel('public:patients')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'patients' },
+          (payload) => {
+            const patientData = (payload.new as any)?.data;
+            if (patientData && patientData.token) {
+              mockDatabase[patientData.token] = patientData;
+              get().triggerQueueUpdate();
+            }
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn('Supabase Realtime:', e);
+    }
   }
 }));
+
+export const syncPatientToSupabase = async (patient: PatientData) => {
+  try {
+    const { error } = await supabase.from('patients').upsert({
+      token: patient.token,
+      patient_id: patient.patientId,
+      abha_id: patient.abhaId,
+      name: patient.name,
+      age: patient.age,
+      gender: patient.gender,
+      phone: patient.phone,
+      chief_complaint: patient.chiefComplaint,
+      triage_level: patient.triageLevel,
+      status: patient.status,
+      admitted_ward: patient.admittedWard,
+      bed_number: patient.bedNumber,
+      admission_date: patient.admissionDate,
+      ipd_stage: patient.ipdStage,
+      data: patient
+    });
+    if (error) console.warn('Supabase upsert error:', error.message);
+  } catch (err) {
+    console.warn('Supabase error:', err);
+  }
+};

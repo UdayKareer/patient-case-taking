@@ -23,7 +23,7 @@ import {
   Clock,
   Stethoscope
 } from 'lucide-react';
-import { usePatientStore, mockDatabase, mockProfiles, type PatientData, type IpdMedication, type IpdProgressNote } from '../store/usePatientStore';
+import { usePatientStore, mockDatabase, mockProfiles, type PatientData, type IpdMedication, type IpdProgressNote, syncPatientToSupabase } from '../store/usePatientStore';
 import type { DoctorOutletContext } from '../components/DoctorLayout';
 import OPDPrescriptionModal from '../components/OPDPrescriptionModal';
 
@@ -326,6 +326,7 @@ export default function DoctorDashboard() {
     if (mockDatabase[patient.token]) {
       mockDatabase[patient.token] = { ...patient };
     }
+    syncPatientToSupabase(patient);
     setStatusMessage(`✅ Medication dose recorded as given at ${nowStr} for ${patient.name}`);
     setTimeout(() => setStatusMessage(''), 3000);
     setDoctorNotes(prev => prev + ' ');
@@ -347,6 +348,7 @@ export default function DoctorDashboard() {
     if (mockDatabase[patient.token]) {
       mockDatabase[patient.token] = { ...patient };
     }
+    syncPatientToSupabase(patient);
     setNewIpdMed({ name: '', dose: '', route: 'IV', schedule: 'BID' });
     setShowAddMedToken(null);
     setStatusMessage(`✅ In-patient medication order added: ${medToAdd.name} (${medToAdd.dose})`);
@@ -366,6 +368,7 @@ export default function DoctorDashboard() {
     if (mockDatabase[patient.token]) {
       mockDatabase[patient.token] = { ...patient };
     }
+    syncPatientToSupabase(patient);
     setNewRoundNote('');
     setShowAddNoteToken(null);
     setStatusMessage(`✅ Daily clinical round note logged for ${patient.name}`);
@@ -377,6 +380,7 @@ export default function DoctorDashboard() {
     if (mockDatabase[patient.token]) {
       mockDatabase[patient.token] = { ...patient };
     }
+    syncPatientToSupabase(patient);
     setStatusMessage(`📋 Clinical stage updated to: ${newStage}`);
     setTimeout(() => setStatusMessage(''), 3000);
     setDoctorNotes(prev => prev + ' ');
@@ -390,6 +394,7 @@ export default function DoctorDashboard() {
     if (mockDatabase[patient.token]) {
       mockDatabase[patient.token] = { ...patient };
     }
+    syncPatientToSupabase(patient);
     setStatusMessage(`🏥 Patient ${patient.name} successfully discharged. Bed freed.`);
     setDischargeModalPatient(null);
     setDischargeSummaryNote('');
