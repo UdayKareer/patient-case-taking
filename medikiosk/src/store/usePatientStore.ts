@@ -1,7 +1,11 @@
 import { create } from 'zustand';
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:5000');
+const socket = io('https://medikiosk-sih-2026.loca.lt', {
+  extraHeaders: {
+    "Bypass-Tunnel-Reminder": "true"
+  }
+});
 
 export interface PatientProfile {
   abhaId: string;
@@ -133,6 +137,21 @@ export interface PatientData {
   status: 'waiting' | 'in_consultation' | 'accepted' | 'amended' | 'rejected' | 'admitted';
   createdAt: string;
 
+  // In-Patient Department (IPD) / Admission Tracking
+  admittedWard?: string;
+  bedNumber?: string;
+  admissionDate?: string;
+  ipdStage?: 'Observation' | 'Acute Care' | 'Stabilizing' | 'Ready for Discharge';
+  ipdProgressNotes?: IpdProgressNote[];
+  ipdMedications?: IpdMedication[];
+  ipdVitals?: {
+    spO2?: string;
+    pulse?: string;
+    bp?: string;
+    temp?: string;
+    respiratoryRate?: string;
+  };
+
   // Hospital & Doctor Check-in Details
   hospitalCode?: string;
   hospitalName?: string;
@@ -140,6 +159,24 @@ export interface PatientData {
   assignedDept?: string;
   assignedRoom?: string;
   queuePosition?: number;
+}
+
+export interface IpdProgressNote {
+  id: string;
+  timestamp: string;
+  doctorName: string;
+  note: string;
+  vitalsSummary?: string;
+}
+
+export interface IpdMedication {
+  id: string;
+  name: string;
+  dose: string;
+  route: 'IV' | 'Oral' | 'SubQ' | 'Nebulization';
+  schedule: string;
+  lastGiven?: string;
+  status: 'Active' | 'Held' | 'Completed';
 }
 
 interface PatientStore {
@@ -466,6 +503,86 @@ export const mockDatabase: Record<string, PatientData> = {
     doctorNotes: '',
     status: 'waiting',
     createdAt: '10:05 AM'
+  },
+  'IPD-304': {
+    patientId: 'IPD-304',
+    token: 'IPD-304',
+    abhaId: '33-9120-7714-8890',
+    abhaVerified: true,
+    name: 'Kavita Rajesh Singhania',
+    age: '52',
+    gender: 'Female',
+    phone: '9822334455',
+    height: '162',
+    weight: '68',
+    language: 'en',
+    mode: 'modern',
+    chiefComplaint: 'Severe acute exacerbation of Bronchial Asthma with secondary lower respiratory tract infection',
+    chiefComplaintHi: 'गंभीर दमा और श्वसन संक्रमण के कारण सांस फूलना',
+    symptomDuration: 'Admitted 3 days ago',
+    symptomSite: 'Chest / Lungs bilaterally',
+    symptomCharacter: 'Severe expiratory wheezing and breathlessness',
+    symptomRadiation: 'None',
+    symptomSeverity: 8,
+    aggravatingFactors: 'Exertion, cold air',
+    relievingFactors: 'Supplemental O2, IV bronchodilators',
+    associatedSymptoms: ['Tachypnea', 'Productive cough', 'Chest tightness'],
+    prakriti: 'Vata-Kapha',
+    agni: 'Manda',
+    koshtha: 'Madhyama',
+    aharaVihara: 'Soft in-patient diet',
+    nidra: 'Improving with nocturnal neb',
+    chronicConditions: [
+      { condition: 'Severe Chronic Bronchial Asthma', duration: '15 years', medication: 'Inhaler Formoterol + Budesonide', status: 'Under treatment' },
+      { condition: 'Mild Essential Hypertension', duration: '3 years', medication: 'Tab Amlodipine 5mg OD', status: 'Stable' }
+    ],
+    allergies: [
+      { allergen: 'NSAIDs (Aspirin)', reaction: 'Bronchospasm / Asthma exacerbation', severity: 'severe' }
+    ],
+    reviewOfSystems: ['No hemoptysis', 'No chest pain', 'Bilateral wheezing clearing'],
+    triageLevel: 'priority',
+    redFlags: ['Asthma flare-up requiring inpatient monitoring'],
+    uploadedDocuments: [],
+    consentHistory: true,
+    consentDocuments: true,
+    consentAyush: false,
+    structuredSummary: {
+      chiefComplaintSummary: '52-year-old female admitted for acute exacerbation of severe asthma with secondary infection.',
+      hpi: 'Patient presented with severe dyspnea, wheezing and productive cough. SpO2 on admission was 89% room air. Admitted to Ward 4B for oxygen therapy, IV steroids and nebulization protocol.',
+      pastHistory: 'Chronic asthma (15 yrs), HTN (3 yrs). Known aspirin sensitivity.',
+      medicationsSummary: 'IV Ceftriaxone, IV Hydrocortisone, Nebulization Duolin, IV Pantoprazole.',
+      allergiesSummary: 'Aspirin/NSAID induced asthma.',
+      rosSummary: 'Chest wheeze improving, SpO2 96% on room air.',
+      redFlagsSummary: ['Inpatient respiratory care'],
+      documentHighlights: [],
+      suggestedWorkup: ['Daily PEFR', 'Serial SpO2 monitoring', 'Step down to oral steroids']
+    },
+    doctorNotes: 'Day 3 Rounds: Patient afebrile, wheeze markedly reduced. Plan: Wean off IV steroids to oral Prednisolone. Prepare for discharge tomorrow.',
+    status: 'admitted',
+    createdAt: '08:30 AM',
+    admittedWard: 'Pulmonary Ward 4B (Acute Care)',
+    bedNumber: 'Bed 12',
+    admissionDate: '06 Sep 2026, 04:15 PM (Day 3)',
+    ipdStage: 'Stabilizing',
+    ipdVitals: {
+      spO2: '96%',
+      pulse: '82 bpm',
+      bp: '126/80 mmHg',
+      temp: '98.6°F',
+      respiratoryRate: '18/min'
+    },
+    ipdMedications: [
+      { id: 'm1', name: 'IV Ceftriaxone', dose: '1g in 100ml NS', route: 'IV', schedule: 'BID (08:00 AM / 08:00 PM)', lastGiven: 'Today 08:00 AM (Nurse Sunita)', status: 'Active' },
+      { id: 'm2', name: 'IV Hydrocortisone', dose: '100mg Bolus', route: 'IV', schedule: 'TID (06:00 / 14:00 / 22:00)', lastGiven: 'Today 02:00 PM', status: 'Active' },
+      { id: 'm3', name: 'Nebulization Duolin', dose: '2.5ml Respule', route: 'Nebulization', schedule: 'Q6H (Every 6 hrs)', lastGiven: 'Today 12:00 PM', status: 'Active' },
+      { id: 'm4', name: 'IV Pantoprazole', dose: '40mg', route: 'IV', schedule: 'OD (Morning before food)', lastGiven: 'Today 07:00 AM', status: 'Active' },
+      { id: 'm5', name: 'Tab Paracetamol', dose: '650mg Oral', route: 'Oral', schedule: 'SOS (If Temp > 100°F)', lastGiven: 'Yesterday 09:00 PM', status: 'Active' }
+    ],
+    ipdProgressNotes: [
+      { id: 'n1', timestamp: '06 Sep, 05:00 PM (Admission)', doctorName: 'Dr. R. Verma, MD', note: 'Admitted from Emergency with acute exacerbation of severe asthma & lower respiratory infection. Wheezing +++, SpO2 89% on room air. Started on 2L O2, IV steroids, IV antibiotics and scheduled nebulizations.', vitalsSummary: 'SpO2: 89% | BP: 142/90 | HR: 104' },
+      { id: 'n2', timestamp: '07 Sep, 09:30 AM (Day 2 Morning Rounds)', doctorName: 'Dr. R. Verma, MD', note: 'Dyspnea significantly improved. Wheezing diminished, SpO2 94% on 2L O2. Patient able to speak in full sentences. Chest air entry improved bilaterally. Continued current IV regimen.', vitalsSummary: 'SpO2: 94% | BP: 132/84 | HR: 90' },
+      { id: 'n3', timestamp: '08 Sep, 08:45 AM (Day 3 Today\'s Rounds)', doctorName: 'Dr. R. Verma, MD', note: 'Patient afebrile for past 24 hours. Cough productive with thinning sputum. SpO2 96% maintaining well on room air. Plan: Wean off supplemental O2. Step down IV Hydrocortisone to oral Prednisolone 30mg tomorrow. Discharge planned for Day 4 if stable.', vitalsSummary: 'SpO2: 96% | BP: 126/80 | HR: 82' }
+    ]
   }
 };
 

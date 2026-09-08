@@ -11,18 +11,19 @@ import {
   Bell,
   Plus,
   Trash2,
-  Copy,
   Check,
   Zap,
   FileText,
-  FileCode2,
   HeartPulse,
   ExternalLink,
   Sparkles,
   History,
-  Building2
+  Building2,
+  Activity,
+  Clock,
+  Stethoscope
 } from 'lucide-react';
-import { usePatientStore, mockDatabase, mockProfiles, type PatientData } from '../store/usePatientStore';
+import { usePatientStore, mockDatabase, mockProfiles, type PatientData, type IpdMedication, type IpdProgressNote } from '../store/usePatientStore';
 import type { DoctorOutletContext } from '../components/DoctorLayout';
 import OPDPrescriptionModal from '../components/OPDPrescriptionModal';
 
@@ -54,12 +55,25 @@ export default function DoctorDashboard() {
     // Use queueTrigger to silence TS, it naturally triggers a re-render from Zustand
   }, [initSocket, queueTrigger]);
 
-  const [activeChartTab, setActiveChartTab] = useState<'soap' | 'ocr' | 'ayush' | 'fhir' | 'history'>('soap');
+  const [activeChartTab, setActiveChartTab] = useState<'soap' | 'ocr' | 'ayush' | 'history'>('soap');
   const [doctorNotes, setDoctorNotes] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
-  const [copiedFhir, setCopiedFhir] = useState(false);
   const [queueFilter, setQueueFilter] = useState<'all' | 'emergency' | 'ayush' | 'waiting'>('all');
+
+  // In-Patient (IPD) Ward Management State
+  const [showAddMedToken, setShowAddMedToken] = useState<string | null>(null);
+  const [showAddNoteToken, setShowAddNoteToken] = useState<string | null>(null);
+  const [newIpdMed, setNewIpdMed] = useState<{ name: string; dose: string; route: 'IV' | 'Oral' | 'Nebulization'; schedule: string }>({
+    name: '',
+    dose: '',
+    route: 'IV',
+    schedule: 'BID'
+  });
+  const [newRoundNote, setNewRoundNote] = useState('');
+  const [newRoundVitals, setNewRoundVitals] = useState('SpO2: 98% | BP: 120/80 | HR: 76');
+  const [dischargeModalPatient, setDischargeModalPatient] = useState<PatientData | null>(null);
+  const [dischargeSummaryNote, setDischargeSummaryNote] = useState('');
 
   // Interactive Rx Prescription Pad State
   const [prescribedMeds, setPrescribedMeds] = useState<PrescribedMedItem[]>([]);
@@ -157,18 +171,58 @@ export default function DoctorDashboard() {
       mockDatabase[selectedPatient.token] = { ...selectedPatient };
     }
     syncToProfileVisit(selectedPatient, prescribedMeds, doctorNotes, '(Discharged/Outpatient)');
-    setStatusMessage(`✅ Intake verified & pushed to Hospital Information System (HIS). ABDM bundle synced.`);
+    setStatusMessage(`✅ Intake verified & pushed to Hospital Information System (HIS).`);
     setTimeout(() => setStatusMessage(''), 3500);
   };
 
   const handleAdmitPatient = () => {
     selectedPatient.status = 'admitted';
     selectedPatient.doctorNotes = doctorNotes;
+    selectedPatient.admittedWard = selectedPatient.admittedWard || 'Pulmonary & Acute Care Ward 4B';
+    selectedPatient.bedNumber = selectedPatient.bedNumber || `Bed ${Math.floor(Math.random() * 15) + 1}`;
+    selectedPatient.admissionDate = selectedPatient.admissionDate || `${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (Day 1)`;
+    selectedPatient.ipdStage = selectedPatient.ipdStage || 'Acute Care';
+    if (!selectedPatient.ipdVitals) {
+      selectedPatient.ipdVitals = {
+        spO2: '96%',
+        pulse: '86 bpm',
+        bp: '128/84 mmHg',
+        temp: '98.8°F',
+        respiratoryRate: '19/min'
+      };
+    }
+    if (!selectedPatient.ipdProgressNotes || selectedPatient.ipdProgressNotes.length === 0) {
+      selectedPatient.ipdProgressNotes = [
+        {
+          id: `note-${Date.now()}`,
+          timestamp: `Today, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (Admission)`,
+          doctorName: 'Dr. R. Verma, MD',
+          note: `Admitted from OPD for in-patient clinical management of ${selectedPatient.structuredSummary?.chiefComplaintSummary || selectedPatient.chiefComplaint}. Immediate bed protocol initiated.`,
+          vitalsSummary: 'SpO2: 96% | BP: 128/84 | HR: 86 bpm'
+        }
+      ];
+    }
+    if (!selectedPatient.ipdMedications || selectedPatient.ipdMedications.length === 0) {
+      selectedPatient.ipdMedications = prescribedMeds.length > 0
+        ? prescribedMeds.map((m, idx) => ({
+            id: `ipd-${idx}-${Date.now()}`,
+            name: m.name,
+            dose: m.dose,
+            route: (m.instructions.toLowerCase().includes('iv') ? 'IV' : 'Oral') as any,
+            schedule: m.frequency,
+            lastGiven: `Today, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+            status: 'Active' as const
+          }))
+        : [
+            { id: 'ipd-1', name: 'IV Normal Saline 500ml', dose: '100ml/hr', route: 'IV', schedule: 'Continuous', lastGiven: 'Running', status: 'Active' as const },
+            { id: 'ipd-2', name: 'IV Pantoprazole', dose: '40mg', route: 'IV', schedule: 'OD (Morning)', lastGiven: 'Today 08:00 AM', status: 'Active' as const }
+          ];
+    }
     if (mockDatabase[selectedPatient.token]) {
       mockDatabase[selectedPatient.token] = { ...selectedPatient };
     }
     syncToProfileVisit(selectedPatient, prescribedMeds, doctorNotes, '(Admitted to IPD)');
-    setStatusMessage(`🚨 Patient marked for Admission. Bed assignment requested in HIS.`);
+    setStatusMessage(`🚨 Patient admitted to ${selectedPatient.admittedWard} (${selectedPatient.bedNumber}). In-patient chart active.`);
     setTimeout(() => setStatusMessage(''), 3500);
   };
 
@@ -263,50 +317,85 @@ export default function DoctorDashboard() {
     return true;
   });
 
-  // Generate FHIR R4 Bundle JSON for ABDM
-  const fhirBundle = {
-    resourceType: 'Bundle',
-    type: 'document',
-    timestamp: new Date().toISOString(),
-    entry: [
-      {
-        resourceType: 'Patient',
-        id: selectedPatient.patientId,
-        identifier: [
-          { system: 'https://healthid.ndhm.gov.in', value: selectedPatient.abhaId },
-          { system: 'https://hospital.opd/token', value: selectedPatient.token },
-        ],
-        name: [{ text: selectedPatient.name }],
-        gender: selectedPatient.gender.toLowerCase(),
-        birthDate: `${new Date().getFullYear() - Number(selectedPatient.age || 45)}-01-01`,
-      },
-      {
-        resourceType: 'Condition',
-        clinicalStatus: { coding: [{ code: 'active' }] },
-        verificationStatus: { coding: [{ code: 'provisional' }] },
-        code: { text: selectedPatient.chiefComplaint },
-        subject: { reference: `Patient/${selectedPatient.patientId}` },
-      },
-      {
-        resourceType: 'Observation',
-        status: 'final',
-        code: { text: 'Triage Risk Level' },
-        valueString: selectedPatient.triageLevel.toUpperCase(),
-      },
-      ...prescribedMeds.map((med) => ({
-        resourceType: 'MedicationRequest',
-        status: 'active',
-        intent: 'order',
-        medicationCodeableConcept: { text: `${med.name} ${med.dose}` },
-        dosageInstruction: [{ text: `${med.frequency} for ${med.duration}. ${med.instructions}` }],
-      })),
-    ],
+  const handleMarkDoseGiven = (patient: PatientData, medId: string) => {
+    if (!patient.ipdMedications) return;
+    const nowStr = `Today, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    patient.ipdMedications = patient.ipdMedications.map(m =>
+      m.id === medId ? { ...m, lastGiven: `${nowStr} (By Nurse)` } : m
+    );
+    if (mockDatabase[patient.token]) {
+      mockDatabase[patient.token] = { ...patient };
+    }
+    setStatusMessage(`✅ Medication dose recorded as given at ${nowStr} for ${patient.name}`);
+    setTimeout(() => setStatusMessage(''), 3000);
+    setDoctorNotes(prev => prev + ' ');
+    setDoctorNotes(prev => prev.trim());
   };
 
-  const handleCopyFhir = () => {
-    navigator.clipboard.writeText(JSON.stringify(fhirBundle, null, 2));
-    setCopiedFhir(true);
-    setTimeout(() => setCopiedFhir(false), 2000);
+  const handleAddIpdMed = (patient: PatientData) => {
+    if (!newIpdMed.name.trim()) return;
+    const medToAdd: IpdMedication = {
+      id: `med-${Date.now()}`,
+      name: newIpdMed.name.trim(),
+      dose: newIpdMed.dose.trim() || '1 Dose',
+      route: newIpdMed.route,
+      schedule: newIpdMed.schedule,
+      lastGiven: 'Ordered / Pending dose',
+      status: 'Active'
+    };
+    patient.ipdMedications = [...(patient.ipdMedications || []), medToAdd];
+    if (mockDatabase[patient.token]) {
+      mockDatabase[patient.token] = { ...patient };
+    }
+    setNewIpdMed({ name: '', dose: '', route: 'IV', schedule: 'BID' });
+    setShowAddMedToken(null);
+    setStatusMessage(`✅ In-patient medication order added: ${medToAdd.name} (${medToAdd.dose})`);
+    setTimeout(() => setStatusMessage(''), 3000);
+  };
+
+  const handleAddRoundNote = (patient: PatientData) => {
+    if (!newRoundNote.trim()) return;
+    const noteToAdd: IpdProgressNote = {
+      id: `note-${Date.now()}`,
+      timestamp: `Today, ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (Rounds)`,
+      doctorName: 'Dr. R. Verma, MD',
+      note: newRoundNote.trim(),
+      vitalsSummary: newRoundVitals.trim() || 'Vitals stable'
+    };
+    patient.ipdProgressNotes = [...(patient.ipdProgressNotes || []), noteToAdd];
+    if (mockDatabase[patient.token]) {
+      mockDatabase[patient.token] = { ...patient };
+    }
+    setNewRoundNote('');
+    setShowAddNoteToken(null);
+    setStatusMessage(`✅ Daily clinical round note logged for ${patient.name}`);
+    setTimeout(() => setStatusMessage(''), 3000);
+  };
+
+  const handleStageChange = (patient: PatientData, newStage: 'Observation' | 'Acute Care' | 'Stabilizing' | 'Ready for Discharge') => {
+    patient.ipdStage = newStage;
+    if (mockDatabase[patient.token]) {
+      mockDatabase[patient.token] = { ...patient };
+    }
+    setStatusMessage(`📋 Clinical stage updated to: ${newStage}`);
+    setTimeout(() => setStatusMessage(''), 3000);
+    setDoctorNotes(prev => prev + ' ');
+    setDoctorNotes(prev => prev.trim());
+  };
+
+  const executeDischarge = (patient: PatientData) => {
+    patient.status = 'accepted';
+    const finalNote = dischargeSummaryNote.trim() || 'Patient stabilized and discharged from in-patient care. Step-down oral medications advised.';
+    syncToProfileVisit(patient, patient.ipdMedications ? patient.ipdMedications.map(m => ({ name: m.name, dose: m.dose, frequency: m.schedule, duration: '5-7 Days', instructions: 'Oral stepdown' })) : [], finalNote, '(Discharged from IPD)');
+    if (mockDatabase[patient.token]) {
+      mockDatabase[patient.token] = { ...patient };
+    }
+    setStatusMessage(`🏥 Patient ${patient.name} successfully discharged. Bed freed.`);
+    setDischargeModalPatient(null);
+    setDischargeSummaryNote('');
+    setTimeout(() => setStatusMessage(''), 3500);
+    setDoctorNotes(prev => prev + ' ');
+    setDoctorNotes(prev => prev.trim());
   };
 
   return (
@@ -555,73 +644,407 @@ export default function DoctorDashboard() {
       {/* VIEW 5: IPD / ADMITTED PATIENTS */}
       {/* ========================================================================= */}
       {activeTab === 'ipd' && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-900">In-Patient Department (IPD) / Admitted Ward</h2>
-              <p className="text-xs text-slate-500">Currently admitted patients under your care</p>
-            </div>
-          </div>
+        <div className="space-y-6">
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {allQueuePatients.filter(p => p.status === 'admitted').map(p => (
-              <div key={p.token} className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4 shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 right-0 px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold tracking-wider uppercase rounded-bl-lg">
-                  Bed Assigned
-                </div>
-                <div className="flex items-start justify-between mt-2">
-                  <div>
-                    <h3 className="font-bold text-slate-900">{p.name}</h3>
-                    <div className="text-xs text-slate-500 mt-0.5">{p.age} Yrs • {p.gender}</div>
-                  </div>
-                  <span className="font-mono text-[10px] font-black bg-slate-200 text-slate-800 px-2 py-1 rounded-md border border-slate-300">
-                    {p.token}
-                  </span>
-                </div>
-                
-                <div className="text-xs space-y-1.5">
-                  <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Diagnosis / Current Stage:</div>
-                  <div className="text-slate-700 font-semibold">{p.structuredSummary.chiefComplaintSummary || p.chiefComplaint}</div>
-                </div>
+          {/* Top In-Patient Ward Status Header */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200/60">
+                  Ward In-Patient Rounds & Orders
+                </span>
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">In-Patient Department (IPD)</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Monitor admitted patients, track bedside vitals, manage Medication Administration Records (MAR), and log daily clinical rounds.
+              </p>
+            </div>
 
-                <div className="text-xs space-y-1.5">
-                  <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Active Meds / Vitals:</div>
-                  <div className="text-slate-600 bg-white p-2.5 rounded-lg border border-slate-100">
-                    <ul className="list-disc pl-4 space-y-1">
-                      <li>Continuous SpO2 & ECG monitoring</li>
-                      <li>IV Fluids @ 100ml/hr</li>
-                      {p.doctorNotes ? <li className="italic line-clamp-1">{p.doctorNotes}</li> : null}
-                    </ul>
-                  </div>
-                </div>
-                
-                <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400">Admitted today</span>
-                  <button
-                    onClick={() => {
-                      p.status = 'accepted';
-                      syncToProfileVisit(p, [], p.doctorNotes || '', '(Discharged from IPD)');
-                      if (mockDatabase[p.token]) mockDatabase[p.token] = { ...p };
-                      setStatusMessage(`Patient ${p.name} discharged from IPD.`);
-                      setTimeout(() => setStatusMessage(''), 3000);
-                      // Force a re-render by doing a shallow clone
-                      setDoctorNotes(doctorNotes + ' ');
-                      setDoctorNotes(doctorNotes);
-                    }}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-xs"
-                  >
-                    Discharge from IPD
-                  </button>
+            <div className="flex items-center gap-3">
+              <div className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                <div className="text-[10px] uppercase font-bold text-slate-400">Total Admitted</div>
+                <div className="text-lg font-black text-slate-900">
+                  {allQueuePatients.filter(p => p.status === 'admitted').length}
                 </div>
               </div>
-            ))}
+              <div className="px-4 py-2 bg-teal-50 border border-teal-200 rounded-xl text-center">
+                <div className="text-[10px] uppercase font-bold text-teal-700">Ward Unit</div>
+                <div className="text-lg font-black text-teal-900">Ward 4B Active</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Admitted Patient Cards Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {allQueuePatients.filter(p => p.status === 'admitted').map(p => {
+              const stageColors: Record<string, string> = {
+                'Observation': 'bg-amber-50 text-amber-800 border-amber-200',
+                'Acute Care': 'bg-red-50 text-red-800 border-red-200',
+                'Stabilizing': 'bg-teal-50 text-teal-800 border-teal-200',
+                'Ready for Discharge': 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              };
+              const currentStage = p.ipdStage || 'Stabilizing';
+
+              return (
+                <div
+                  key={p.token}
+                  className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5 shadow-xs hover:border-slate-300 transition-all relative overflow-hidden"
+                >
+                  {/* Top Ward & Bed Bar */}
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 bg-slate-900 text-white font-mono text-xs font-bold rounded-lg shadow-2xs">
+                          🛏️ {p.bedNumber || 'Bed 12'}
+                        </span>
+                        <span className="text-xs font-bold text-slate-700">
+                          {p.admittedWard || 'Ward 4B (Acute Care)'}
+                        </span>
+                      </div>
+                      <h3 className="font-extrabold text-slate-900 text-lg mt-1.5">{p.name}</h3>
+                      <div className="text-xs text-slate-500 font-medium">
+                        {p.age} Yrs • {p.gender} • Token: <span className="font-mono font-bold text-slate-700">{p.token}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Stage:</span>
+                        <select
+                          value={currentStage}
+                          onChange={(e) => handleStageChange(p, e.target.value as any)}
+                          className={`text-xs font-bold px-2.5 py-1 rounded-lg border cursor-pointer focus:outline-none ${stageColors[currentStage] || 'bg-slate-100 text-slate-800 border-slate-200'}`}
+                        >
+                          <option value="Acute Care">Acute Care</option>
+                          <option value="Observation">Observation</option>
+                          <option value="Stabilizing">Stabilizing</option>
+                          <option value="Ready for Discharge">Ready for Discharge</option>
+                        </select>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                        <Clock size={12} /> {p.admissionDate || 'Admitted Today'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Bedside Live Vitals Strip */}
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 grid grid-cols-5 gap-2 text-center">
+                    <div className="space-y-0.5">
+                      <div className="text-[10px] font-bold uppercase text-slate-400">SpO2</div>
+                      <div className="text-sm font-black text-teal-700">{p.ipdVitals?.spO2 || '96%'}</div>
+                    </div>
+                    <div className="space-y-0.5 border-l border-slate-200/70">
+                      <div className="text-[10px] font-bold uppercase text-slate-400">Heart Rate</div>
+                      <div className="text-sm font-black text-slate-900">{p.ipdVitals?.pulse || '82 bpm'}</div>
+                    </div>
+                    <div className="space-y-0.5 border-l border-slate-200/70">
+                      <div className="text-[10px] font-bold uppercase text-slate-400">BP</div>
+                      <div className="text-sm font-black text-slate-900">{p.ipdVitals?.bp || '126/80'}</div>
+                    </div>
+                    <div className="space-y-0.5 border-l border-slate-200/70">
+                      <div className="text-[10px] font-bold uppercase text-slate-400">Temp</div>
+                      <div className="text-sm font-black text-slate-900">{p.ipdVitals?.temp || '98.6°F'}</div>
+                    </div>
+                    <div className="space-y-0.5 border-l border-slate-200/70">
+                      <div className="text-[10px] font-bold uppercase text-slate-400">Resp Rate</div>
+                      <div className="text-sm font-black text-slate-900">{p.ipdVitals?.respiratoryRate || '18/min'}</div>
+                    </div>
+                  </div>
+
+                  {/* Primary In-Patient Diagnosis */}
+                  <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 text-xs space-y-1">
+                    <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider block">Admitting Diagnosis & Clinical Context:</span>
+                    <p className="font-semibold text-slate-800 leading-relaxed">
+                      {p.structuredSummary?.chiefComplaintSummary || p.chiefComplaint}
+                    </p>
+                  </div>
+
+                  {/* SECTION A: MEDICATION ADMINISTRATION RECORD (MAR) */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Activity size={14} className="text-teal-600" />
+                        Active In-Patient Meds & Infusions ({p.ipdMedications?.length || 0})
+                      </span>
+                      <button
+                        onClick={() => setShowAddMedToken(showAddMedToken === p.token ? null : p.token)}
+                        className="text-[11px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200 flex items-center gap-1"
+                      >
+                        <Plus size={12} /> Add Medicine
+                      </button>
+                    </div>
+
+                    {/* Inline Form to Add Medicine */}
+                    {showAddMedToken === p.token && (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3 animate-fade-in text-xs">
+                        <div className="font-bold text-slate-800 text-[11px]">Order New In-Patient Medication</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            placeholder="Medicine name (e.g. IV Ceftriaxone)"
+                            value={newIpdMed.name}
+                            onChange={(e) => setNewIpdMed({ ...newIpdMed, name: e.target.value })}
+                            className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Dose (e.g. 1g IV)"
+                            value={newIpdMed.dose}
+                            onChange={(e) => setNewIpdMed({ ...newIpdMed, dose: e.target.value })}
+                            className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <select
+                            value={newIpdMed.route}
+                            onChange={(e) => setNewIpdMed({ ...newIpdMed, route: e.target.value as any })}
+                            className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+                          >
+                            <option value="IV">IV Infusion / Bolus</option>
+                            <option value="Oral">Oral (Tab / Syp)</option>
+                            <option value="Nebulization">Nebulization</option>
+                            <option value="SubQ">Subcutaneous</option>
+                          </select>
+                          <input
+                            type="text"
+                            placeholder="Schedule (e.g. BID, TID, Q6H)"
+                            value={newIpdMed.schedule}
+                            onChange={(e) => setNewIpdMed({ ...newIpdMed, schedule: e.target.value })}
+                            className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => setShowAddMedToken(null)}
+                            className="px-2.5 py-1 text-slate-500 hover:text-slate-800 font-semibold"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleAddIpdMed(p)}
+                            className="px-3 py-1 bg-teal-700 hover:bg-teal-800 text-white rounded-lg font-bold"
+                          >
+                            Save Order
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {p.ipdMedications && p.ipdMedications.length > 0 ? (
+                        p.ipdMedications.map((med) => {
+                          const routeBadge: Record<string, string> = {
+                            'IV': 'bg-blue-100 text-blue-800 border-blue-200',
+                            'Oral': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                            'Nebulization': 'bg-purple-100 text-purple-800 border-purple-200',
+                            'SubQ': 'bg-amber-100 text-amber-800 border-amber-200'
+                          };
+
+                          return (
+                            <div
+                              key={med.id}
+                              className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-between gap-3 text-xs"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${routeBadge[med.route] || 'bg-slate-200 text-slate-700'}`}>
+                                    {med.route}
+                                  </span>
+                                  <span className="font-bold text-slate-900 truncate">{med.name}</span>
+                                  <span className="text-slate-500">({med.dose})</span>
+                                </div>
+                                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
+                                  <span>Schedule: <strong className="text-slate-700">{med.schedule}</strong></span>
+                                  <span>•</span>
+                                  <span className="truncate">Last given: {med.lastGiven || 'Scheduled'}</span>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={() => handleMarkDoseGiven(p, med.id)}
+                                className="shrink-0 px-2.5 py-1 bg-white hover:bg-teal-50 text-teal-800 border border-slate-200 hover:border-teal-300 rounded-lg text-[11px] font-bold transition-all shadow-2xs"
+                                title="Click to log this dose as administered"
+                              >
+                                ✓ Dose Given
+                              </button>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-lg text-center">
+                          No active in-patient medications ordered yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* SECTION B: CLINICAL PROGRESS ROUNDS & TRAJECTORY */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Stethoscope size={14} className="text-teal-600" />
+                        Daily Clinical Rounds & Trajectory ({p.ipdProgressNotes?.length || 0})
+                      </span>
+                      <button
+                        onClick={() => setShowAddNoteToken(showAddNoteToken === p.token ? null : p.token)}
+                        className="text-[11px] font-bold text-teal-700 hover:text-teal-900 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200 flex items-center gap-1"
+                      >
+                        <Plus size={12} /> Add Round Note
+                      </button>
+                    </div>
+
+                    {/* Inline Form to Add Round Note */}
+                    {showAddNoteToken === p.token && (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 animate-fade-in text-xs">
+                        <div className="font-bold text-slate-800 text-[11px]">Log Daily Clinical Observations</div>
+                        <textarea
+                          rows={2}
+                          placeholder="E.g. Patient afebrile, chest wheeze reduced, ready for step-down..."
+                          value={newRoundNote}
+                          onChange={(e) => setNewRoundNote(e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-teal-700"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Bedside Vitals (e.g. SpO2: 96% | BP: 120/80 | HR: 76)"
+                          value={newRoundVitals}
+                          onChange={(e) => setNewRoundVitals(e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => setShowAddNoteToken(null)}
+                            className="px-2.5 py-1 text-slate-500 hover:text-slate-800 font-semibold"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleAddRoundNote(p)}
+                            className="px-3 py-1 bg-teal-700 hover:bg-teal-800 text-white rounded-lg font-bold"
+                          >
+                            Save Round Note
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {p.ipdProgressNotes && p.ipdProgressNotes.length > 0 ? (
+                        p.ipdProgressNotes.map((note) => (
+                          <div key={note.id} className="p-3 bg-slate-50/80 border border-slate-200/70 rounded-xl text-xs space-y-1">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="font-bold text-teal-800">{note.doctorName || 'Dr. R. Verma, MD'}</span>
+                              <span className="text-slate-400 font-mono">{note.timestamp}</span>
+                            </div>
+                            <p className="text-slate-700 leading-relaxed font-medium">{note.note}</p>
+                            {note.vitalsSummary && (
+                              <div className="text-[10px] text-slate-500 font-mono bg-white px-2 py-0.5 rounded border border-slate-200/60 inline-block mt-0.5">
+                                {note.vitalsSummary}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-lg text-center">
+                          No daily round notes recorded yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions Footer */}
+                  <div className="pt-4 border-t border-slate-200 flex items-center justify-between gap-3">
+                    <button
+                      onClick={() => {
+                        handleSelectPatient(p);
+                        setActiveTab('consultation');
+                      }}
+                      className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <ExternalLink size={14} />
+                      <span>Open Full Clinical Chart</span>
+                    </button>
+
+                    <button
+                      onClick={() => setDischargeModalPatient(p)}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 shadow-xs"
+                    >
+                      <Check size={14} />
+                      <span>Discharge from IPD</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
             {allQueuePatients.filter(p => p.status === 'admitted').length === 0 && (
-              <div className="col-span-full py-12 text-center text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
-                <Building2 size={32} className="mx-auto mb-3 opacity-20" />
-                <p>No patients currently admitted to IPD.</p>
+              <div className="col-span-full py-16 text-center text-slate-400 bg-white border border-dashed border-slate-200 rounded-2xl space-y-2">
+                <Building2 size={36} className="mx-auto mb-2 opacity-30 text-teal-700" />
+                <h4 className="font-bold text-slate-700 text-sm">No Patients Currently Admitted</h4>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  Patients marked for admission from the OPD consultation chart will automatically appear here with bed allocations.
+                </p>
               </div>
             )}
           </div>
+
+          {/* Discharge Confirmation Modal */}
+          {dischargeModalPatient && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-md w-full shadow-2xl space-y-4 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                      🏥
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-900">Confirm Patient Discharge</h3>
+                      <p className="text-[11px] text-slate-500">{dischargeModalPatient.name} (Bed: {dischargeModalPatient.bedNumber || 'Bed 12'})</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDischargeModalPatient(null)}
+                    className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="text-xs text-slate-600 leading-relaxed">
+                  Patient condition will be updated to <strong>Discharged</strong>. The allocated bed will be freed in HIS, and discharge summary will sync to their lifelong health record.
+                </div>
+
+                <div className="space-y-1.5 text-xs">
+                  <label className="font-bold text-slate-700">Discharge Summary & Home Care Instructions:</label>
+                  <textarea
+                    rows={3}
+                    placeholder="E.g. Condition stabilized, afebrile for 48 hrs. Continue Tab Cefixime 200mg BD for 5 days. Review in OPD after 1 week."
+                    value={dischargeSummaryNote}
+                    onChange={(e) => setDischargeSummaryNote(e.target.value)}
+                    className="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-teal-700 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setDischargeModalPatient(null)}
+                    className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => executeDischarge(dischargeModalPatient)}
+                    className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+                  >
+                    <Check size={14} />
+                    <span>Authorize Discharge & Free Bed</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
@@ -847,17 +1270,6 @@ export default function DoctorDashboard() {
                   <span>AYUSH Dashavidha Pariksha</span>
                 </button>
 
-                <button
-                  onClick={() => setActiveChartTab('fhir')}
-                  className={`py-3 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
-                    activeChartTab === 'fhir'
-                      ? 'border-teal-700 text-teal-800 bg-white shadow-2xs'
-                      : 'border-transparent text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <FileCode2 size={15} />
-                  <span>ABDM FHIR Bundle</span>
-                </button>
 
                 <button
                   onClick={() => setActiveChartTab('history')}
@@ -1348,24 +1760,6 @@ export default function DoctorDashboard() {
                 </div>
               )}
 
-              {/* Tab Content 4: ABDM FHIR Bundle */}
-              {activeChartTab === 'fhir' && (
-                <div className="p-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-slate-900">ABDM FHIR R4 Bundle Payload</h3>
-                    <button
-                      onClick={handleCopyFhir}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-800 border border-teal-200 rounded-xl text-xs font-bold hover:bg-teal-100 transition-colors"
-                    >
-                      {copiedFhir ? <Check size={14} /> : <Copy size={14} />}
-                      {copiedFhir ? 'Copied' : 'Copy JSON'}
-                    </button>
-                  </div>
-                  <div className="bg-slate-950 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto max-h-96">
-                    <pre>{JSON.stringify(fhirBundle, null, 2)}</pre>
-                  </div>
-                </div>
-              )}
 
               {/* Tab Content 5: Past Medical History */}
               {activeChartTab === 'history' && (

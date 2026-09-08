@@ -129,47 +129,66 @@ export default function PatientDashboard() {
     setIsUploadingDoc(true);
     setUploadError('');
 
-    const formData = new FormData();
-    formData.append('document', file);
-
     try {
-      // In a real scenario this points to our new Node.js server
-      const response = await fetch('http://localhost:5000/api/ocr', {
-        method: 'POST',
-        body: formData,
-      });
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const rawResult = reader.result as string;
+          const base64Data = rawResult.includes(',') ? rawResult.split(',')[1] : rawResult;
 
-      const result = await response.json();
-      
-      if (response.ok && result.success) {
-        // Mock updating profile with new document
-        updateProfile({
-          uploadedDocuments: [
-            ...currentProfile.uploadedDocuments,
-            {
-              id: 'doc-' + Date.now(),
-              name: file.name,
-              type: file.type.includes('pdf') ? 'Lab Report' : 'Prescription',
-              date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-              extractedDiagnoses: result.data.diagnoses || [],
-              extractedMeds: (result.data.prescriptions || []).map((p: any) => ({
-                name: p.medicineName,
-                dose: p.dosage,
-                frequency: p.frequency
-              })),
-              extractedLabs: [] // You could map vitals or labs here
-            }
-          ]
-        });
-      } else {
-        setUploadError(result.error || 'Failed to process document');
-      }
+          const response = await fetch('/api/ocr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileBase64: base64Data,
+              mimeType: file.type || 'image/jpeg'
+            }),
+          });
+
+          const result = await response.json();
+          
+          if (response.ok && result.success) {
+            updateProfile({
+              uploadedDocuments: [
+                ...currentProfile.uploadedDocuments,
+                {
+                  id: 'doc-' + Date.now(),
+                  name: file.name,
+                  type: file.type.includes('pdf') ? 'Lab Report' : 'Prescription',
+                  date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                  extractedDiagnoses: result.data?.diagnoses || [],
+                  extractedMeds: (result.data?.prescriptions || []).map((p: any) => ({
+                    name: p.medicineName,
+                    dose: p.dosage,
+                    frequency: p.frequency
+                  })),
+                  extractedLabs: []
+                }
+              ]
+            });
+          } else {
+            setUploadError(result.error || 'Failed to process document');
+          }
+        } catch (innerErr) {
+          console.error(innerErr);
+          setUploadError('Failed to parse AI response.');
+        } finally {
+          setIsUploadingDoc(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      };
+
+      reader.onerror = () => {
+        setUploadError('Failed to read file.');
+        setIsUploadingDoc(false);
+      };
+
+      reader.readAsDataURL(file);
+      return;
     } catch (err) {
       console.error(err);
-      setUploadError('Server unreachable. Ensure the backend is running.');
-    } finally {
+      setUploadError('Failed to upload document.');
       setIsUploadingDoc(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
