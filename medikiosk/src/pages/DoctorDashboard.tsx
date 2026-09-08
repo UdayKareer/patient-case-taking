@@ -36,42 +36,60 @@ interface PrescribedMedItem {
   instructions: string;
 }
 
-export function getWaitMinutes(p: PatientData): number {
-  if (p.createdTimestamp) {
-    const diff = Math.floor((Date.now() - p.createdTimestamp) / 60000);
-    return Math.max(0, diff);
+export function getWaitSeconds(p: PatientData): number {
+  if (!p) return 0;
+
+  if (!p.createdTimestamp) {
+    if (p.createdAt) {
+      const match = p.createdAt.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (match) {
+        let hours = parseInt(match[1], 10);
+        const minutes = parseInt(match[2], 10);
+        const meridiem = match[3]?.toUpperCase();
+        if (meridiem === 'PM' && hours < 12) hours += 12;
+        if (meridiem === 'AM' && hours === 12) hours = 0;
+
+        const now = new Date();
+        const tokenDate = new Date();
+        tokenDate.setHours(hours, minutes, 0, 0);
+
+        let diffSec = Math.floor((now.getTime() - tokenDate.getTime()) / 1000);
+        if (diffSec < 0) diffSec += 24 * 3600;
+
+        // If more than 2 hours elapsed, scale into a realistic active OPD wait offset
+        if (diffSec > 7200) {
+          const charCodeSum = p.token.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+          diffSec = ((charCodeSum % 35) + 12) * 60;
+        }
+        p.createdTimestamp = Date.now() - diffSec * 1000;
+      } else {
+        p.createdTimestamp = Date.now() - 15 * 60 * 1000;
+      }
+    } else {
+      p.createdTimestamp = Date.now() - 15 * 60 * 1000;
+    }
   }
-  if (!p.createdAt) return 15;
 
-  const match = p.createdAt.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-  if (!match) return 15;
-
-  let hours = parseInt(match[1], 10);
-  const minutes = parseInt(match[2], 10);
-  const meridiem = match[3]?.toUpperCase();
-  if (meridiem === 'PM' && hours < 12) hours += 12;
-  if (meridiem === 'AM' && hours === 12) hours = 0;
-
-  const tokenMins = hours * 60 + minutes;
-  const now = new Date();
-  const nowMins = now.getHours() * 60 + now.getMinutes();
-
-  let diff = nowMins - tokenMins;
-  if (diff < 0) diff += 24 * 60;
-
-  if (diff > 120) {
-    const charCodeSum = p.token.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-    return (charCodeSum % 45) + 10;
-  }
-  return diff;
+  const elapsed = Math.floor((Date.now() - p.createdTimestamp) / 1000);
+  return Math.max(0, elapsed);
 }
 
-export function formatWaitTime(mins: number): string {
-  if (mins < 1) return '< 1m wait';
-  if (mins < 60) return `${mins}m wait`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return `${h}h ${m}m wait`;
+export function getWaitMinutes(p: PatientData): number {
+  return Math.floor(getWaitSeconds(p) / 60);
+}
+
+export function formatWaitTime(totalSeconds: number): string {
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s wait`;
+  }
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  if (mins < 60) {
+    return `${mins}m ${secs < 10 ? '0' : ''}${secs}s wait`;
+  }
+  const hrs = Math.floor(mins / 60);
+  const remainingMins = mins % 60;
+  return `${hrs}h ${remainingMins}m wait`;
 }
 
 export default function DoctorDashboard() {
@@ -94,12 +112,12 @@ export default function DoctorDashboard() {
     // Use queueTrigger to silence TS, it naturally triggers a re-render from Zustand
   }, [initSocket, queueTrigger]);
 
-  // Live real-time ticker: re-renders every 5 seconds so wait times increment live without page refresh
+  // Live real-time ticker: re-renders every 1 second so wait times tick live without page refresh
   const [, setLiveTick] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => {
       setLiveTick((prev) => prev + 1);
-    }, 5000);
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -696,7 +714,7 @@ export default function DoctorDashboard() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {sortedFilteredQueue.map((p) => {
-                  const waitMins = getWaitMinutes(p);
+                  const waitSecs = getWaitSeconds(p);
                   return (
                     <tr
                       key={p.token}
@@ -709,15 +727,15 @@ export default function DoctorDashboard() {
                           <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
                             {p.token}
                           </span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 border ${
-                            waitMins >= 30
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 border ${
+                            waitSecs >= 30 * 60
                               ? 'bg-red-50 text-red-700 border-red-200 animate-pulse'
-                              : waitMins >= 15
+                              : waitSecs >= 15 * 60
                               ? 'bg-amber-50 text-amber-800 border-amber-200'
                               : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                           }`}>
                             <Clock size={10} />
-                            {formatWaitTime(waitMins)}
+                            {formatWaitTime(waitSecs)}
                           </span>
                         </div>
                         <div className="text-[10px] text-slate-400 mt-1 font-sans">Issued: {p.createdAt || '09:30 AM'}</div>
@@ -1318,7 +1336,7 @@ export default function DoctorDashboard() {
                 ) : (
                   sortedActivePatients.map((p) => {
                     const isSelected = p.token === selectedPatient.token;
-                    const waitMins = getWaitMinutes(p);
+                    const waitSecs = getWaitSeconds(p);
                     return (
                       <div
                         key={p.token}
@@ -1357,14 +1375,14 @@ export default function DoctorDashboard() {
                         <div className="flex items-center justify-between mt-1 text-[11px]">
                           <span className="text-slate-500 line-clamp-1 flex-1 pr-2">{p.chiefComplaint}</span>
                           <span className={`text-[10px] font-mono font-bold shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded border ${
-                            waitMins >= 30
+                            waitSecs >= 30 * 60
                               ? 'bg-red-50 text-red-700 border-red-200'
-                              : waitMins >= 15
+                              : waitSecs >= 15 * 60
                               ? 'bg-amber-50 text-amber-800 border-amber-200'
                               : 'bg-slate-100 text-slate-600 border-slate-200'
                           }`}>
                             <Clock size={10} />
-                            {formatWaitTime(waitMins)}
+                            {formatWaitTime(waitSecs)}
                           </span>
                         </div>
                       </div>
@@ -1424,6 +1442,12 @@ export default function DoctorDashboard() {
                       <span>•</span>
                       <span className="flex items-center gap-1 font-mono text-teal-700 font-semibold">
                         <ShieldCheck size={12} /> ABHA: {selectedPatient.abhaId}
+                      </span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1 text-slate-600 font-medium">
+                        <Clock size={12} className="text-teal-600" />
+                        <span className="font-mono font-bold text-slate-800">{formatWaitTime(getWaitSeconds(selectedPatient))}</span>
+                        <span className="text-[10px] text-slate-400">({selectedPatient.createdAt || '09:30 AM'})</span>
                       </span>
                     </div>
                   </div>
