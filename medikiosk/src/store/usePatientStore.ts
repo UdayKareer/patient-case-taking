@@ -104,12 +104,13 @@ export interface PatientData {
   symptomSite: string;
   symptomCharacter: string;
   symptomRadiation: string;
+  symptomTiming: string; // SOCRATES 'T' - Time course / diurnal timing pattern
   symptomSeverity: number; // 1-10
   aggravatingFactors: string;
   relievingFactors: string;
   associatedSymptoms: string[];
 
-  // AYUSH Dashavidha / Ashtavidha Pariksha
+  // AYUSH Dashavidha / Ashtavidha Pariksha (Only populated if patient opts into AYUSH)
   prakriti: string;
   agni: string; // Digestive Fire
   koshtha: string; // Bowel Nature
@@ -224,6 +225,7 @@ const createInitialPatient = (): PatientData => ({
   symptomSite: '',
   symptomCharacter: '',
   symptomRadiation: '',
+  symptomTiming: '',
   symptomSeverity: 5,
   aggravatingFactors: '',
   relievingFactors: '',
@@ -247,7 +249,7 @@ const createInitialPatient = (): PatientData => ({
 
   consentHistory: true,
   consentDocuments: true,
-  consentAyush: true,
+  consentAyush: false,
 
   structuredSummary: {
     chiefComplaintSummary: '',
@@ -293,15 +295,16 @@ export const mockDatabase: Record<string, PatientData> = {
     symptomSite: 'Center of chest radiating to left arm and jaw',
     symptomCharacter: 'Crushing elephant-on-chest pressure',
     symptomRadiation: 'Left shoulder, inner arm, lower jaw',
+    symptomTiming: 'Constant unremitting crushing pressure since 45 minutes',
     symptomSeverity: 9,
     aggravatingFactors: 'Any slight movement or exertion',
     relievingFactors: 'None, persisting at complete rest',
     associatedSymptoms: ['Profuse cold sweating', 'Shortness of breath', 'Nausea / Lightheadedness'],
-    prakriti: 'Pitta-Kapha',
-    agni: 'Manda',
-    koshtha: 'Krura',
-    aharaVihara: 'Sedentary lifestyle, high sodium',
-    nidra: 'Insomnia',
+    prakriti: '',
+    agni: '',
+    koshtha: '',
+    aharaVihara: '',
+    nidra: '',
     chronicConditions: [
       { condition: 'Type 2 Diabetes Mellitus', duration: '8 years', medication: 'Tab Metformin 1000mg BD', status: 'Sub-optimally controlled' },
       { condition: 'Essential Hypertension', duration: '5 years', medication: 'Tab Telmisartan 40mg OD', status: 'Poor compliance' }
@@ -381,6 +384,7 @@ export const mockDatabase: Record<string, PatientData> = {
     symptomSite: 'Epigastrium and bilateral knee joints',
     symptomCharacter: 'Vidaha (burning), Gaurava (heaviness), Sandhishoola',
     symptomRadiation: 'Retro-sternal burning upward radiation',
+    symptomTiming: 'Epigastric burning worse 1-2 hours post meals; knee stiffness worse in mornings on rising',
     symptomSeverity: 6,
     aggravatingFactors: 'Pungent, oily foods (Katu/Amla Ahara), mental stress, fasting',
     relievingFactors: 'Cold milk, light bland diet (Laghu Ahara)',
@@ -462,15 +466,16 @@ export const mockDatabase: Record<string, PatientData> = {
     symptomSite: 'Chest / Upper respiratory tract',
     symptomCharacter: 'Productive cough with yellowish phlegm, chest tightness',
     symptomRadiation: 'None',
+    symptomTiming: 'Cough worse at night and early morning; daytime episodes triggered by cold air',
     symptomSeverity: 5,
     aggravatingFactors: 'Cold air exposure, night time, dust',
     relievingFactors: 'Steam inhalation, warm fluids',
     associatedSymptoms: ['Wheezing on exhalation', 'Nasal congestion', 'Mild fatigue'],
-    prakriti: 'Kapha-Vata',
-    agni: 'Sama',
-    koshtha: 'Madhyama',
-    aharaVihara: 'Mixed diet, non-smoker',
-    nidra: 'Interrupted by cough at night',
+    prakriti: '',
+    agni: '',
+    koshtha: '',
+    aharaVihara: '',
+    nidra: '',
     chronicConditions: [
       { condition: 'Bronchial Asthma (Childhood onset)', duration: 'Since age 12', medication: 'Inhaler Budecort 200mcg SOS', status: 'Intermittent' }
     ],
@@ -524,15 +529,16 @@ export const mockDatabase: Record<string, PatientData> = {
     symptomSite: 'Chest / Lungs bilaterally',
     symptomCharacter: 'Severe expiratory wheezing and breathlessness',
     symptomRadiation: 'None',
+    symptomTiming: 'Continuous dyspnea on admission; now stabilizing with mild morning tightness',
     symptomSeverity: 8,
     aggravatingFactors: 'Exertion, cold air',
     relievingFactors: 'Supplemental O2, IV bronchodilators',
     associatedSymptoms: ['Tachypnea', 'Productive cough', 'Chest tightness'],
-    prakriti: 'Vata-Kapha',
-    agni: 'Manda',
-    koshtha: 'Madhyama',
-    aharaVihara: 'Soft in-patient diet',
-    nidra: 'Improving with nocturnal neb',
+    prakriti: '',
+    agni: '',
+    koshtha: '',
+    aharaVihara: '',
+    nidra: '',
     chronicConditions: [
       { condition: 'Severe Chronic Bronchial Asthma', duration: '15 years', medication: 'Inhaler Formoterol + Budesonide', status: 'Under treatment' },
       { condition: 'Mild Essential Hypertension', duration: '3 years', medication: 'Tab Amlodipine 5mg OD', status: 'Stable' }

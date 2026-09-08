@@ -1263,17 +1263,19 @@ export default function DoctorDashboard() {
                   <span>OCR Document Scans & Labs ({selectedPatient.uploadedDocuments.length})</span>
                 </button>
 
-                <button
-                  onClick={() => setActiveChartTab('ayush')}
-                  className={`py-3 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
-                    activeChartTab === 'ayush'
-                      ? 'border-teal-700 text-teal-800 bg-white shadow-2xs'
-                      : 'border-transparent text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <Leaf size={15} />
-                  <span>AYUSH Dashavidha Pariksha</span>
-                </button>
+                {(selectedPatient.mode === 'ayush' || (selectedPatient.consentAyush && (Boolean(selectedPatient.prakriti) || Boolean(selectedPatient.ayushResponses?.length)))) && (
+                  <button
+                    onClick={() => setActiveChartTab('ayush')}
+                    className={`py-3 px-3.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+                      activeChartTab === 'ayush'
+                        ? 'border-emerald-700 text-emerald-800 bg-white shadow-2xs'
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Leaf size={15} className="text-emerald-600" />
+                    <span>AYUSH Integrative Pariksha</span>
+                  </button>
+                )}
 
 
                 <button
@@ -1321,85 +1323,122 @@ export default function DoctorDashboard() {
                     </div>
 
                     {/* SOCRATES Clinical Matrix Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                      <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Site & Location</span>
-                        <input
-                          type="text"
-                          value={selectedPatient.symptomSite || ''}
-                          onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomSite: e.target.value })}
-                          className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                          placeholder="e.g. Retrosternal"
-                        />
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
+                          <span className="text-teal-600 font-extrabold">SOCRATES Protocol:</span>
+                          <span>[S]ite • [O]nset • [C]haracter • [R]adiation • [A]ssociations • [T]iming • [E]xacerbating • [S]everity</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-medium">Standard Clinical History</span>
                       </div>
 
-                      <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Onset / Duration</span>
-                        <input
-                          type="text"
-                          value={selectedPatient.symptomDuration || ''}
-                          onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomDuration: e.target.value })}
-                          className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                          placeholder="e.g. Acute onset"
-                        />
-                      </div>
-
-                      <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Character of Pain</span>
-                        <input
-                          type="text"
-                          value={selectedPatient.symptomCharacter || ''}
-                          onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomCharacter: e.target.value })}
-                          className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                          placeholder="e.g. Crushing pressure"
-                        />
-                      </div>
-
-                      <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Radiation</span>
-                        <input
-                          type="text"
-                          value={selectedPatient.symptomRadiation || ''}
-                          onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomRadiation: e.target.value })}
-                          className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                          placeholder="e.g. Left Arm & Jaw"
-                        />
-                      </div>
-
-                      <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Aggravating Factors</span>
-                        <input
-                          type="text"
-                          value={selectedPatient.aggravatingFactors || ''}
-                          onChange={(e) => setSelectedPatient({ ...selectedPatient, aggravatingFactors: e.target.value })}
-                          className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                          placeholder="e.g. Exertion"
-                        />
-                      </div>
-
-                      <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Relieving Factors</span>
-                        <input
-                          type="text"
-                          value={selectedPatient.relievingFactors || ''}
-                          onChange={(e) => setSelectedPatient({ ...selectedPatient, relievingFactors: e.target.value })}
-                          className="w-full font-semibold text-slate-900 outline-none bg-transparent"
-                          placeholder="e.g. Rest"
-                        />
-                      </div>
-
-                      <div className="p-3 bg-white rounded-xl border border-slate-200 col-span-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Pain Severity (1-10)</span>
-                        <div className="flex items-center gap-2 mt-1">
-                          <input 
-                            type="range"
-                            min="1"
-                            max="10"
-                            value={selectedPatient.symptomSeverity || 7}
-                            onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomSeverity: parseInt(e.target.value) })}
-                            className="w-full accent-teal-600"
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                            <span className="text-teal-700 font-black mr-1">[S]</span>Site & Location
+                          </span>
+                          <input
+                            type="text"
+                            value={selectedPatient.symptomSite || ''}
+                            onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomSite: e.target.value })}
+                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
+                            placeholder="e.g. Retrosternal"
                           />
-                          <span className="font-black text-slate-900 w-8 text-right">{selectedPatient.symptomSeverity || 7}/10</span>
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                            <span className="text-teal-700 font-black mr-1">[O]</span>Onset & Duration
+                          </span>
+                          <input
+                            type="text"
+                            value={selectedPatient.symptomDuration || ''}
+                            onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomDuration: e.target.value })}
+                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
+                            placeholder="e.g. Sudden / 45 mins ago"
+                          />
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                            <span className="text-teal-700 font-black mr-1">[C]</span>Character / Nature
+                          </span>
+                          <input
+                            type="text"
+                            value={selectedPatient.symptomCharacter || ''}
+                            onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomCharacter: e.target.value })}
+                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
+                            placeholder="e.g. Crushing, burning, stabbing"
+                          />
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                            <span className="text-teal-700 font-black mr-1">[R]</span>Radiation
+                          </span>
+                          <input
+                            type="text"
+                            value={selectedPatient.symptomRadiation || ''}
+                            onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomRadiation: e.target.value })}
+                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
+                            placeholder="e.g. Left arm, jaw, none"
+                          />
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                            <span className="text-teal-700 font-black mr-1">[T]</span>Timing / Course
+                          </span>
+                          <input
+                            type="text"
+                            value={selectedPatient.symptomTiming || ''}
+                            onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomTiming: e.target.value })}
+                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
+                            placeholder="e.g. Constant, episodic waves"
+                          />
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                            <span className="text-teal-700 font-black mr-1">[E+]</span>Aggravating Factors
+                          </span>
+                          <input
+                            type="text"
+                            value={selectedPatient.aggravatingFactors || ''}
+                            onChange={(e) => setSelectedPatient({ ...selectedPatient, aggravatingFactors: e.target.value })}
+                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
+                            placeholder="e.g. Exertion, food"
+                          />
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-slate-200 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                            <span className="text-teal-700 font-black mr-1">[E-]</span>Relieving Factors
+                          </span>
+                          <input
+                            type="text"
+                            value={selectedPatient.relievingFactors || ''}
+                            onChange={(e) => setSelectedPatient({ ...selectedPatient, relievingFactors: e.target.value })}
+                            className="w-full font-semibold text-slate-900 outline-none bg-transparent"
+                            placeholder="e.g. Rest, antacid"
+                          />
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-slate-200">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                            <span className="text-teal-700 font-black mr-1">[S]</span>Severity (1-10)
+                          </span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <input 
+                              type="range"
+                              min="1"
+                              max="10"
+                              value={selectedPatient.symptomSeverity || 7}
+                              onChange={(e) => setSelectedPatient({ ...selectedPatient, symptomSeverity: parseInt(e.target.value) })}
+                              className="w-full accent-teal-600"
+                            />
+                            <span className="font-black text-slate-900 w-8 text-right">{selectedPatient.symptomSeverity || 7}/10</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1723,44 +1762,48 @@ export default function DoctorDashboard() {
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2">
                       <Leaf size={18} className="text-emerald-600" />
-                      <h3 className="text-sm font-extrabold text-slate-900 uppercase">AYUSH Dashavidha Pariksha Profile</h3>
+                      <h3 className="text-sm font-extrabold text-slate-900 uppercase">AYUSH Integrative Pariksha Profile</h3>
                     </div>
                     <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                      Ayurvedic Integrative Desk
+                      Patient Consented AYUSH Desk
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                     <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-200/80 space-y-1.5">
                       <span className="text-[10px] font-bold text-emerald-800 uppercase block">Deha Prakriti (Constitution)</span>
-                      <span className="text-sm font-black text-emerald-950">{selectedPatient.prakriti || 'Vata-Pitta'}</span>
-                      <p className="text-[11px] text-emerald-800 leading-relaxed">
-                        Predominant Pitta dosha indicates inflammatory and hyper-acidic vulnerability.
-                      </p>
+                      <span className="text-sm font-black text-emerald-950">{selectedPatient.prakriti || 'Not assessed'}</span>
+                      {selectedPatient.prakriti && (
+                        <p className="text-[11px] text-emerald-800 leading-relaxed">
+                          Assessed constitutional balance according to Ayurvedic Dosha pariksha.
+                        </p>
+                      )}
                     </div>
 
                     <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-200/80 space-y-1.5">
                       <span className="text-[10px] font-bold text-amber-800 uppercase block">Jatharagni (Digestive Fire)</span>
-                      <span className="text-sm font-black text-amber-950">{selectedPatient.agni || 'Tikshnagni (Sharp/Burning)'}</span>
-                      <p className="text-[11px] text-amber-800 leading-relaxed">
-                        Correlates with rapid gastric burning, sour regurgitation, and hyperchlorhydria.
-                      </p>
+                      <span className="text-sm font-black text-amber-950">{selectedPatient.agni || 'Not assessed'}</span>
+                      {selectedPatient.agni && (
+                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                          Metabolic fire and digestive assimilation capacity.
+                        </p>
+                      )}
                     </div>
 
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
                       <span className="text-[10px] font-bold text-slate-500 uppercase block">Koshtha (Bowel Regularity)</span>
-                      <span className="text-sm font-black text-slate-900">{selectedPatient.koshtha || 'Krura (Constipation Tendency)'}</span>
+                      <span className="text-sm font-black text-slate-900">{selectedPatient.koshtha || 'Not assessed'}</span>
                     </div>
 
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
                       <span className="text-[10px] font-bold text-slate-500 uppercase block">Nidra (Sleep Pattern)</span>
-                      <span className="text-sm font-black text-slate-900">{selectedPatient.nidra || 'Alpa Nidra (< 6 hrs, disturbed)'}</span>
+                      <span className="text-sm font-black text-slate-900">{selectedPatient.nidra || 'Not assessed'}</span>
                     </div>
                   </div>
 
                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs">
                     <span className="font-bold text-slate-700 block">Ahara & Vihara (Dietary & Lifestyle Stressors):</span>
-                    <p className="text-slate-600">{selectedPatient.aharaVihara || 'Spicy, irregular meals with heavy tea consumption'}</p>
+                    <p className="text-slate-600">{selectedPatient.aharaVihara || 'Standard balanced diet, regular lifestyle'}</p>
                   </div>
                 </div>
               )}

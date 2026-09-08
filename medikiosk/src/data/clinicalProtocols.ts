@@ -42,10 +42,10 @@ export const CHIEF_COMPLAINT_PRESETS: ComplaintCategory[] = [
     subtitleEn: 'Acidity, burning, severe pain, bloating, bowel distress',
     subtitleHi: 'पेट में जलन, खट्टी डकारें, दर्द, उल्टी या दस्त',
     commonComplaints: [
-      { textEn: 'Severe retrosternal burning, sour acidic regurgitation and epigastric burning (Amlapitta)', textHi: 'सीने और पेट में तेज जलन, खट्टी डकारें और एसिडिटी (अम्लपित्त)', defaultSite: 'Epigastrium / Upper abdomen' },
+      { textEn: 'Severe retrosternal burning, sour acidic regurgitation and heartburn', textHi: 'सीने और पेट में तेज जलन, खट्टी डकारें और एसिडिटी', defaultSite: 'Epigastrium / Upper abdomen' },
       { textEn: 'Severe cramping abdominal pain with recurrent nausea & vomiting', textHi: 'पेट में तेज मरोड़ का दर्द और बार-बार उल्टी या जी मिचलाना', defaultSite: 'Umbilical / Abdomen' },
       { textEn: 'Frequent watery loose motions with dehydration, weakness and stomach cramps', textHi: 'बार-बार पतले दस्त, कमजोरी, पानी की कमी और पेट में ऐंठन', defaultSite: 'Lower Abdomen' },
-      { textEn: 'Chronic constipation, hard dry stools, severe straining and gas bloating (Krura Koshtha)', textHi: 'लंबे समय से सख्त कब्ज, शौच में बहुत कठिनाई और पेट फूलना', defaultSite: 'Lower Abdomen / Colon' },
+      { textEn: 'Chronic constipation, hard dry stools, severe straining and gas bloating', textHi: 'लंबे समय से सख्त कब्ज, शौच में बहुत कठिनाई और पेट फूलना', defaultSite: 'Lower Abdomen / Colon' },
       { textEn: 'Sharp pain in upper right side of abdomen after oily or spicy meals', textHi: 'तला-भुना या भारी खाना खाने के बाद पेट के ऊपरी दाहिने हिस्से में तेज दर्द', defaultSite: 'Right Hypochondrium' }
     ]
   },
@@ -71,9 +71,9 @@ export const CHIEF_COMPLAINT_PRESETS: ComplaintCategory[] = [
     subtitleEn: 'Joint pain, stiffness, sciatica, severe migraine headache',
     subtitleHi: 'जोड़ों का दर्द, जकड़न, साइटिका, सर्वाइकल और तेज सिरदर्द',
     commonComplaints: [
-      { textEn: 'Bilateral knee joint pain, swelling, stiffness and grinding sound on walking (Sandhivata)', textHi: 'दोनों घुटनों में दर्द, सूजन, जकड़न और चलने पर कट-कट की आवाज (संधिवात)', defaultSite: 'Bilateral Knees' },
+      { textEn: 'Bilateral knee joint pain, swelling, stiffness and grinding sound on walking (Osteoarthritis)', textHi: 'दोनों घुटनों में दर्द, सूजन, जकड़न और चलने पर कट-कट की आवाज', defaultSite: 'Bilateral Knees' },
       { textEn: 'Severe throbbing one-sided headache with nausea and light sensitivity (Migraine)', textHi: 'सिर के एक हिस्से में तेज धड़कता हुआ दर्द, उल्टी जैसा लगना और रोशनी से परेशानी', defaultSite: 'Frontotemporal head' },
-      { textEn: 'Severe radiating lower back pain shooting down into leg and calf (Sciatica / Gridhrasi)', textHi: 'कमर के निचले हिस्से से लेकर पैर और पिंडलियों तक खिंचाव और तेज दर्द (साइटिका)', defaultSite: 'Lumbar spine to leg' },
+      { textEn: 'Severe radiating lower back pain shooting down into leg and calf (Sciatica)', textHi: 'कमर के निचले हिस्से से लेकर पैर और पिंडलियों तक खिंचाव और तेज दर्द (साइटिका)', defaultSite: 'Lumbar spine to leg' },
       { textEn: 'Neck pain and stiffness radiating into shoulder and arm (Cervical Spondylosis)', textHi: 'गर्दन में अकड़न और दर्द जो कंधे और हाथ तक जाता है (सर्वाइकल)', defaultSite: 'Cervical spine & Shoulder' },
       { textEn: 'Sudden dizziness, spinning sensation and feeling unsteady on standing (Vertigo)', textHi: 'अचानक चक्कर आना, सब कुछ घूमता हुआ लगना और खड़े होने में संतुलन बिगड़ना', defaultSite: 'Head & Vestibular' }
     ]
@@ -81,6 +81,15 @@ export const CHIEF_COMPLAINT_PRESETS: ComplaintCategory[] = [
 ];
 
 export const SOCRATES_OPTIONS = {
+  site: [
+    { id: 'chest_cardiac', labelEn: 'Chest & Retrosternal / Precordium', labelHi: 'सीने के बीच में या दिल के पास' },
+    { id: 'head_neck', labelEn: 'Head & Neck / ENT / Throat', labelHi: 'सिर, गर्दन या गले में' },
+    { id: 'upper_abdomen', labelEn: 'Upper Abdomen / Stomach / Epigastrium', labelHi: 'पेट के ऊपरी हिस्से में' },
+    { id: 'lower_abdomen', labelEn: 'Lower Abdomen / Pelvic region', labelHi: 'पेट के निचले हिस्से में' },
+    { id: 'back_spine', labelEn: 'Back & Spine / Lumbar area', labelHi: 'पीठ, कमर या रीढ़ की हड्डी में' },
+    { id: 'joints_limbs', labelEn: 'Joints / Knees / Arms / Legs', labelHi: 'जोड़ों, घुटनों या हाथ-पैरों में' },
+    { id: 'generalized', labelEn: 'Generalized / Full body discomfort', labelHi: 'पूरे शरीर में फैला हुआ' }
+  ],
   onset: [
     { id: 'sudden_acute', labelEn: 'Sudden (< 1 hour ago)', labelHi: 'अचानक (1 घंटे से भी कम)', isRedFlag: true },
     { id: 'hours_today', labelEn: 'Started earlier today', labelHi: 'आज सुबह से शुरू हुआ' },
@@ -89,7 +98,7 @@ export const SOCRATES_OPTIONS = {
   ],
   character: [
     { id: 'crushing', labelEn: 'Heavy crushing / Pressure', labelHi: 'भारी दबाव / जकड़न', isRedFlag: true },
-    { id: 'burning', labelEn: 'Burning / Acidic (Vidaha)', labelHi: 'तेज जलन / अम्लपित्त' },
+    { id: 'burning', labelEn: 'Burning / Acidic sensation', labelHi: 'तेज जलन / एसिडिटी' },
     { id: 'sharp', labelEn: 'Sharp / Stabbing needle-like', labelHi: 'तीखा / सुई चुभने जैसा' },
     { id: 'dull_ache', labelEn: 'Dull deep continuous ache', labelHi: 'धीमा लगातार बना रहने वाला दर्द' },
     { id: 'throbbing', labelEn: 'Pulsating / Throbbing', labelHi: 'धड़कता हुआ दर्द (धड़कन जैसा)' },
@@ -100,6 +109,13 @@ export const SOCRATES_OPTIONS = {
     { id: 'left_arm_jaw', labelEn: 'Radiates to left arm, shoulder, or jaw', labelHi: 'बाएं हाथ, कंधे या जबड़े में फैलता है', isRedFlag: true },
     { id: 'back', labelEn: 'Radiates through to the back', labelHi: 'पीठ के पीछे की तरफ जाता है' },
     { id: 'groin', labelEn: 'Radiates downwards to lower abdomen/groin', labelHi: 'पेट के निचले हिस्से या जांघ में जाता है' }
+  ],
+  timing: [
+    { id: 'continuous', labelEn: 'Constant continuous (Never subsides)', labelHi: 'लगातार बना रहता है (रुकता नहीं)' },
+    { id: 'intermittent_waves', labelEn: 'Episodic waves (Comes & goes)', labelHi: 'रुक-रुक कर आता है (दौरे की तरह)' },
+    { id: 'morning_worse', labelEn: 'Worst upon morning awakening', labelHi: 'सुबह उठने पर सबसे ज्यादा' },
+    { id: 'night_worse', labelEn: 'Worst at night / while lying flat', labelHi: 'रात में या सीधा लेटने पर ज्यादा' },
+    { id: 'post_meal', labelEn: 'Triggers shortly after meals', labelHi: 'खाना खाने के थोड़ी देर बाद शुरू' }
   ],
   aggravating: [
     { id: 'exertion', labelEn: 'Physical walking or stairs', labelHi: 'चलने या सीढ़ियां चढ़ने पर' },
@@ -142,6 +158,12 @@ export const FEVER_OPTIONS = {
     { id: 'throat_chest', labelEn: 'Mainly in throat, chest & coughing', labelHi: 'मुख्यतः गले में खराश और सीने में' },
     { id: 'head_eyes', labelEn: 'Severe headache and pain behind eyes', labelHi: 'तेज सिरदर्द और आंखों में दर्द' },
     { id: 'stomach_gut', labelEn: 'With nausea, stomach pain & loose stools', labelHi: 'पेट दर्द, उल्टी या दस्त के साथ' }
+  ],
+  timing: [
+    { id: 'continuous', labelEn: 'Continuous sustained fever (No break)', labelHi: 'लगातार बना रहने वाला बुखार' },
+    { id: 'intermittent', labelEn: 'Intermittent spikes with normal periods', labelHi: 'रुक-रुक कर चढ़ने-उतरने वाला बुखार' },
+    { id: 'evening_rise', labelEn: 'Rises predominantly in evening/night', labelHi: 'मुख्यतः शाम या रात में तेज होना' },
+    { id: 'remittent', labelEn: 'Fluctuates throughout day without settling', labelHi: 'दिन भर घटता-बढ़ता रहता है' }
   ],
   aggravating: [
     { id: 'cold_exposure', labelEn: 'Exposure to cold air / AC / breeze', labelHi: 'ठंडी हवा या एसी में रहने पर' },
