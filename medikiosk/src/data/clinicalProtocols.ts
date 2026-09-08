@@ -279,24 +279,234 @@ export const GI_OPTIONS = {
   ]
 };
 
+export interface DashavidhaData {
+  prakriti: string;
+  vikriti: string;
+  sara: string;
+  samhanana: string;
+  pramana: string;
+  satmya: string;
+  sattva: string;
+  aharaShakti: string;
+  vyayamaShakti: string;
+  vaya: string;
+}
+
+export interface AshtaSthanaData {
+  nadi: string;
+  mutra: string;
+  mala: string;
+  jihwa: string;
+  shabda: string;
+  sparsha: string;
+  druk: string;
+  akruti: string;
+}
+
+export const DASHAVIDHA_PARIKSHA_DATA = {
+  // 1. Prakriti - Baseline Constitution / Phenotype
+  prakriti: {
+    nameEn: 'Baseline Constitution (Prakriti)',
+    nameHi: 'मूल शारीरिक प्रकृति',
+    options: [
+      { id: 'vata', labelEn: 'Vata Dominant (Lean frame, active, light sleep, variable appetite)', labelHi: 'वात प्रधान (पतला शरीर, चंचल, हल्की नींद, अनियमित भूख)' },
+      { id: 'pitta', labelEn: 'Pitta Dominant (Medium build, warm skin, sharp appetite, heat intolerance)', labelHi: 'पित्त प्रधान (मध्यम कद, शरीर में गर्मी, तेज भूख, गर्मी असहनीय)' },
+      { id: 'kapha', labelEn: 'Kapha Dominant (Sturdy broad build, calm, deep sleep, slow digestion)', labelHi: 'कफ प्रधान (मजबूत शरीर, शांत स्वभाव, गहरी नींद, धीमा पाचन)' },
+      { id: 'vata_pitta', labelEn: 'Vata-Pitta Combination (Lean to medium, quick, sensitive to heat/cold)', labelHi: 'वात-पित्त मिश्रित (फुर्तीला, सर्दी-गर्मी के प्रति संवेदनशील)' },
+      { id: 'pitta_kapha', labelEn: 'Pitta-Kapha Combination (Athletic build, good stamina, moderate hunger)', labelHi: 'पित्त-कफ मिश्रित (मजबूत सहनशक्ति, संतुलित स्वास्थ्य)' },
+      { id: 'sama', labelEn: 'Tridoshaja / Balanced (Equally balanced doshas)', labelHi: 'समदोष / त्रिदोषज (संतुलित प्रकृति)' }
+    ]
+  },
+  // 2. Vikriti - Current Morbidity / Imbalance State
+  vikriti: {
+    nameEn: 'Current Pathological Imbalance (Vikriti)',
+    nameHi: 'वर्तमान दोष विकृति / रोग स्थिति',
+    options: [
+      { id: 'vata_vriddhi', labelEn: 'Vata Imbalance (Neuralgia, body aches, dryness, flatulence, insomnia)', labelHi: 'वात वृद्धि (शरीर दर्द, नसों में खिंचाव, रूखापन, अनिद्रा, गैस)' },
+      { id: 'pitta_vriddhi', labelEn: 'Pitta Imbalance (Hyperacidity, burning sensation, fever, inflammation, rash)', labelHi: 'पित्त वृद्धि (खट्टी डकारें, जलन, बुखार, सूजन, लाल चकत्ते)' },
+      { id: 'kapha_vriddhi', labelEn: 'Kapha Imbalance (Productive cough, chest heaviness, water retention, lethargy)', labelHi: 'कफ वृद्धि (बलगम, छाती में भारीपन, सुस्ती, सूजन, भारी सिर)' },
+      { id: 'sannipata', labelEn: 'Tridoshic / Mixed Imbalance (Complex multi-system chronic involvement)', labelHi: 'सन्निपात / मिश्रित दोष (जटिल बहु-प्रणालीय असंतुलन)' },
+      { id: 'prakritistha', labelEn: 'Near Baseline / Mild Transient Disturbance', labelHi: 'प्रकृतिस्थ / सामान्य अल्पकालिक लक्षण' }
+    ]
+  },
+  // 3. Sara - Tissue Vitality & Tone
+  sara: {
+    nameEn: 'Tissue Vitality & Structural Reserve (Sara)',
+    nameHi: 'धातु सारता (शारीरिक बल व ऊर्जा भंडार)',
+    options: [
+      { id: 'pravara', labelEn: 'High Reserve (Pravara Sara - robust immunity, glowing skin, firm musculature)', labelHi: 'प्रवर सार (उत्तम रोग प्रतिरोधक क्षमता, सुदृढ़ मांसपेशियां, तेज)' },
+      { id: 'madhyama', labelEn: 'Moderate Reserve (Madhyama Sara - average stamina and tissue recovery)', labelHi: 'मध्यम सार (सामान्य सहनशक्ति और औसत स्वास्थ्य)' },
+      { id: 'avara', labelEn: 'Low Reserve (Avara Sara - easily exhausted, fragile tissue tone, slow healing)', labelHi: 'अवर सार (जल्दी थकान, कमजोर मांसपेशियां, धीमी रिकवरी)' }
+    ]
+  },
+  // 4. Samhanana - Musculoskeletal Build & Compactness
+  samhanana: {
+    nameEn: 'Musculoskeletal Build & Compactness (Samhanana)',
+    nameHi: 'शारीरिक संहनन (शरीर का गठन व सुदृढ़ता)',
+    options: [
+      { id: 'susamhanita', labelEn: 'Compact & Well-Knit (Susamhanita - symmetrical, well-developed joints/muscles)', labelHi: 'सुसंहनित (मजबूत जोड़ व सुगठित मांसपेशियां)' },
+      { id: 'madhyama', labelEn: 'Average Build (Madhyama - balanced, normal tone)', labelHi: 'मध्यम संहनन (सामान्य शारीरिक गठन)' },
+      { id: 'heena', labelEn: 'Frail / Loose Jointed (Heena - prominent veins, loose joints, underweight/overweight)', labelHi: 'हीन संहनन (ढीले जोड़, कमजोर शारीरिक ढांचा)' }
+    ]
+  },
+  // 5. Pramana - Anthropometric Proportions
+  pramana: {
+    nameEn: 'Anthropometric Proportions & Symmetry (Pramana)',
+    nameHi: 'शारीरिक प्रमाण (शरीर का अनुपात व सममितता)',
+    options: [
+      { id: 'sama', labelEn: 'Proportionate & Symmetrical (Anatomically balanced BMI and limb span)', labelHi: 'सम प्रमाण (कद, वजन और अंगों का संतुलित अनुपात)' },
+      { id: 'vishama_heena', labelEn: 'Ectomorphic / Disproportionate Lean (Underweight, elongated limbs)', labelHi: 'विषम-हीन प्रमाण (पतलापन, कम वजन, लंबा ढांचा)' },
+      { id: 'vishama_adhika', labelEn: 'Endomorphic / Truncal Adiposity (Central obesity, high BMI)', labelHi: 'विषम-अधिक प्रमाण (मोटापा, अत्यधिक वजन, असंतुलित वसा)' }
+    ]
+  },
+  // 6. Satmya - Environmental & Dietary Adaptability
+  satmya: {
+    nameEn: 'Environmental & Dietary Adaptability (Satmya)',
+    nameHi: 'सात्म्य (खान-पान और मौसम की अनुकूलता)',
+    options: [
+      { id: 'sarva_rasa', labelEn: 'High Adaptability (Sarva-rasa Satmya - tolerates diverse foods, climates & seasonal shifts)', labelHi: 'सर्व-रस सात्म्य (हर प्रकार का भोजन व मौसम आसानी से सहना)' },
+      { id: 'madhyama', labelEn: 'Moderate Adaptability (Sensitive to sudden cold/heat, tolerates common diets)', labelHi: 'मध्यम सात्म्य (सामान्य अनुकूलता, मौसम बदलने पर हल्का प्रभाव)' },
+      { id: 'alpa_satmya', labelEn: 'Hypersensitive (Alpa Satmya - prone to allergies, food intolerances, sensitive gut)', labelHi: 'अल्प सात्म्य (एलर्जी प्रवण, पेट संवेदनशील, खान-पान में असहनशीलता)' }
+    ]
+  },
+  // 7. Sattva - Mental Resilience & Stress Tolerance
+  sattva: {
+    nameEn: 'Mental Resilience & Stress Tolerance (Sattva)',
+    nameHi: 'सत्त्व बल (मानसिक दृढ़ता व तनाव सहनशक्ति)',
+    options: [
+      { id: 'pravara', labelEn: 'High Resilience (Pravara Sattva - calm under stress, high pain threshold, positive coping)', labelHi: 'प्रवर सत्त्व (तनाव में शांत, दर्द सहने की उच्च क्षमता, सकारात्मक)' },
+      { id: 'madhyama', labelEn: 'Moderate Resilience (Madhyama Sattva - copes with encouragement and reassurance)', labelHi: 'मध्यम सत्त्व (सामान्य मानसिक बल, समझाने पर संभलना)' },
+      { id: 'avara', labelEn: 'Low Resilience (Avara Sattva - highly anxious, low pain tolerance, easily overwhelmed)', labelHi: 'अवर सत्त्व (घबराहट, अत्यधिक चिंता, दर्द सहने में कठिनाई)' }
+    ]
+  },
+  // 8. Ahara-shakti - Metabolic & Digestive Capacity
+  aharaShakti: {
+    nameEn: 'Metabolic & Digestive Capacity (Ahara-shakti / Agni)',
+    nameHi: 'आहार-शक्ति व जठराग्नि (पाचन बल व भूख)',
+    options: [
+      { id: 'samagni', labelEn: 'Samagni (Optimal balanced digestion, timely hunger, comfortable post-meal assimilation)', labelHi: 'समाग्नि (संतुलित पाचन, समय पर भूख, भोजन आसानी से पचना)' },
+      { id: 'tikshnagni', labelEn: 'Tikshnagni (Hypermetabolic, frequent intense hunger, acidity, heat feeling)', labelHi: 'तीक्ष्णाग्नि (अत्यधिक तेज भूख, खट्टी डकारें, जलन की प्रवृत्ति)' },
+      { id: 'mandagni', labelEn: 'Mandagni (Sluggish digestion, heaviness for hours after meals, poor appetite)', labelHi: 'मंदाग्नि (धीमा पाचन, भूख की कमी, खाने के बाद लंबे समय तक भारीपन)' },
+      { id: 'vishamagni', labelEn: 'Vishamagni (Erratic/unpredictable appetite, occasional bloating and gas)', labelHi: 'विषमाग्नि (अनियमित पाचन, कभी तेज भूख कभी बिल्कुल नहीं, गैस)' }
+    ]
+  },
+  // 9. Vyayama-shakti - Physical Endurance
+  vyayamaShakti: {
+    nameEn: 'Physical Endurance & Work Capacity (Vyayama-shakti)',
+    nameHi: 'व्यायाम-शक्ति (शारीरिक सहनशक्ति व कार्यक्षमता)',
+    options: [
+      { id: 'pravara', labelEn: 'High Endurance (Easily performs heavy physical labor/exercise without fatigue)', labelHi: 'प्रवर शक्ति (भारी कार्य व व्यायाम आसानी से करने में सक्षम)' },
+      { id: 'madhyama', labelEn: 'Moderate Endurance (Handles routine daily work, tires with strenuous exertion)', labelHi: 'मध्यम शक्ति (दैनिक कार्य सामान्य रूप से, अधिक परिश्रम पर थकान)' },
+      { id: 'avara', labelEn: 'Low Endurance (Dyspneic/exhausted on climbing stairs or mild walking)', labelHi: 'अवर शक्ति (हल्के चलने या सीढ़ी चढ़ने पर ही सांस फूलना/थकान)' }
+    ]
+  },
+  // 10. Vaya - Biological Age Stage
+  vaya: {
+    nameEn: 'Biological Age Stage & Metabolic Phase (Vaya)',
+    nameHi: 'वय (आयु अवस्था व शारीरिक अवस्था)',
+    options: [
+      { id: 'bala', labelEn: 'Balya / Growth Phase (< 16 years, Kapha dominant tissue synthesis)', labelHi: 'बाल्यावस्था (< 16 वर्ष, शारीरिक विकास अवस्था)' },
+      { id: 'madhyama', labelEn: 'Madhyama / Productive Phase (16–60 years, Pitta dominant metabolic vigor)', labelHi: 'मध्यमावस्था (16–60 वर्ष, सक्रिय उत्पादक अवस्था)' },
+      { id: 'vriddha', labelEn: 'Vriddha / Degenerative Phase (> 60 years, Vata dominant catabolic wear)', labelHi: 'वृद्धावस्था (> 60 वर्ष, जोड़ों में घिसाव, प्राकृतिक क्षय)' }
+    ]
+  }
+};
+
+export const ASHTA_STHANA_PARIKSHA_DATA = {
+  // 1. Nadi - Pulse & Arterial Character
+  nadi: {
+    nameEn: 'Pulse Rate & Arterial Character (Nadi)',
+    nameHi: 'नाड़ी परीक्षा (हृदय गति व लय)',
+    options: [
+      { id: 'normal', labelEn: 'Normal Regular (70-80 bpm, steady rhythmic pulse)', labelHi: 'सामान्य नियमित (70-80 प्रति मिनट, लयबद्ध)' },
+      { id: 'rapid_bounding', labelEn: 'Rapid & Bounding (Manduka/Pitta gati - tachycardic, warm, forceful)', labelHi: 'द्रुत व तीव्र नाड़ी (पित्त प्रधान - तेज गति, गर्म अनुभव)' },
+      { id: 'slow_full', labelEn: 'Slow & Soft (Hamsa/Kapha gati - bradycardic, heavy regular pulse)', labelHi: 'मन्द व गंभीर नाड़ी (कफ प्रधान - धीमी, गहरी गति)' },
+      { id: 'thread_irregular', labelEn: 'Feeble & Irregular (Sarpa/Vata gati - weak, thread-like, rapid fluctuation)', labelHi: 'अस्थिर व सूक्ष्म नाड़ी (वात प्रधान - कमजोर, लहरदार गति)' }
+    ]
+  },
+  // 2. Mutra - Urinary Output & Examination
+  mutra: {
+    nameEn: 'Urinary Output & Characteristics (Mutra)',
+    nameHi: 'मूत्र परीक्षा (मूत्र की रंगत व मात्रा)',
+    options: [
+      { id: 'normal_clear', labelEn: 'Clear Pale Yellow (Normal specific gravity, non-burning, 4-6 times/day)', labelHi: 'सामान्य पारदर्शी हल्का पीला (बिना जलन, सामान्य आवृत्ति)' },
+      { id: 'high_colored_burning', labelEn: 'Dark Yellow / Burning (Pitta - concentrated, dysuria, mild dehydration)', labelHi: 'गहरा पीला व जलनयुक्त (पित्त लक्षण, अल्पमूत्रता)' },
+      { id: 'turbid_cloudy', labelEn: 'Turbid / Cloudy (Kapha / Avila - sediment, possible UTI/glycosuria)', labelHi: 'मटमैला व भारी (कफ लक्षण, संक्रमण या गाढ़ापन)' },
+      { id: 'frothy_pale', labelEn: 'Frothy / Frequent Clear (Vata / Phenila - polyuria, frothy urine)', labelHi: 'झागदार व बार-बार (वात लक्षण, झाग आना)' }
+    ]
+  },
+  // 3. Mala - Bowel Habits & Stool Character
+  mala: {
+    nameEn: 'Bowel Regularity & Stool Consistency (Mala)',
+    nameHi: 'मल परीक्षा (पेट साफ होना व मल की प्रकृति)',
+    options: [
+      { id: 'normal_formed', labelEn: 'Normal Formed (Samamala - once daily, non-sticky, easily evacuated)', labelHi: 'सामान्य बंधा हुआ (दिन में एक बार, आसानी से पेट साफ)' },
+      { id: 'constipated_hard', labelEn: 'Constipated & Hard (Krura - scybalous, dry, straining required)', labelHi: 'कड़ा व सूखा मल (कब्ज, जोर लगाना, सूखापन)' },
+      { id: 'loose_frequent', labelEn: 'Loose / Watery (Mridu - semi-solid, 2-4 times, urgency)', labelHi: 'ढीला व बार-बार (अतिसार की प्रवृत्ति, पतला मल)' },
+      { id: 'sticky_mucus', labelEn: 'Sticky with Mucus (Sama / Sluggish - incomplete evacuation feeling)', labelHi: 'चिपचिपा व आंवयुक्त (पेट पूरी तरह साफ न होने का आभास)' }
+    ]
+  },
+  // 4. Jihwa - Tongue Appearance & Oral Coating
+  jihwa: {
+    nameEn: 'Tongue Appearance & Oral Coating (Jihwa)',
+    nameHi: 'जिह्वा परीक्षा (जीभ की रंगत व मैल/परत)',
+    options: [
+      { id: 'clean_pink', labelEn: 'Clean & Pink (Nirama - moist, papillae normal, no Saburral coating)', labelHi: 'स्वच्छ व गुलाबी (निराम - कोई सफेद परत नहीं, स्वस्थ)' },
+      { id: 'white_coated', labelEn: 'Thick White Coated (Sama - heavy Saburral furring, oral halitosis, indigestion)', labelHi: 'सफेद मोटी परतयुक्त (साम - मंदाग्नि, मुंह में बेस्वादी, भारी मैल)' },
+      { id: 'red_raw', labelEn: 'Red / Erythematous (Pitta - hyperemic, red margins, aphthae prone)', labelHi: 'लाल व चमकदार (पित्त - जीभ लाल, छालों की प्रवृत्ति)' },
+      { id: 'fissured_dry', labelEn: 'Fissured & Dry (Vata - dry, mapped fissures, papillae atrophy)', labelHi: 'सूखी व कटी-फटी (वात - दरारें, सूखापन, रूखापन)' }
+    ]
+  },
+  // 5. Shabda - Voice Quality & Breath Sounds
+  shabda: {
+    nameEn: 'Voice Quality & Breath Sounds (Shabda)',
+    nameHi: 'शब्द परीक्षा (आवाज व श्वास की ध्वनि)',
+    options: [
+      { id: 'clear_resonant', labelEn: 'Clear & Resonant (Spashta - normal phonation and vesicular breathing)', labelHi: 'स्पष्ट व मधुर (सामान्य स्पष्ट आवाज, फेफड़ों की साफ ध्वनि)' },
+      { id: 'hoarse_husky', labelEn: 'Hoarse / Dysphonic (Mandasvara - laryngitic, cracked, throat dryness)', labelHi: 'भारी व बैठी हुई आवाज (गले में खराश, सूखापन)' },
+      { id: 'feeble_weak', labelEn: 'Feeble & Exhausted (Ksheenasvara - shallow breathing, speaks with effort)', labelHi: 'धीमी व कमजोर आवाज (सांस में कमजोरी, बोलने में थकान)' },
+      { id: 'wheeze_stridor', labelEn: 'Wheezing / Audible Rattling (Ghurghura - broncho-spasm, rhonchi)', labelHi: 'घड़घड़ाहट व सीटी जैसी आवाज (कफ जमाव, सांस फूलना)' }
+    ]
+  },
+  // 6. Sparsha - Skin Texture & Temperature
+  sparsha: {
+    nameEn: 'Skin Temperature & Palpatory Texture (Sparsha)',
+    nameHi: 'स्पर्श परीक्षा (त्वचा का तापमान व बनावट)',
+    options: [
+      { id: 'smooth_normal', labelEn: 'Smooth & Euthermic (Snigdha - normal turgor, supple, pleasant warm)', labelHi: 'कोमल व सामान्य तापमान (स्निग्ध - स्वस्थ त्वचा, लचीलापन)' },
+      { id: 'warm_febrile', labelEn: 'Warm / Febrile (Ushna - hot, flushed, diaphoretic)', labelHi: 'गर्म व बुखारयुक्त (उष्ण - शरीर तपना, पसीना)' },
+      { id: 'cold_clammy', labelEn: 'Cold & Clammy (Sheeta - vasoconstricted, peripheral chilliness)', labelHi: 'शीत व चिपचिपा (हाथ-पैर ठंडे, कमजोरी)' },
+      { id: 'dry_rough', labelEn: 'Dry & Rough (Ruksha - scaly, reduced turgor, cracked heels)', labelHi: 'सूखी व रूखी (त्वचा में खिंचाव, पपड़ीदार)' }
+    ]
+  },
+  // 7. Druk - Ocular & Scleral Inspection
+  druk: {
+    nameEn: 'Ocular & Scleral Inspection (Druk)',
+    nameHi: 'दृग् परीक्षा (आंखों व कंजेक्टिवा की स्थिति)',
+    options: [
+      { id: 'clear_normal', labelEn: 'Clear & Lustrous (Prakrita - clear sclera, pink palpebral conjunctiva)', labelHi: 'सामान्य व चमकदार (साफ आंखें, स्वस्थ गुलाबी रंगत)' },
+      { id: 'pale_conjunctiva', labelEn: 'Pale Palpebral Conjunctiva (Pandu - clinical anemia, lack of luster)', labelHi: 'पीली/सफेद कंजेक्टिवा (पाण्डु - हीमोग्लोबिन की कमी, खून की कमी)' },
+      { id: 'icteric_yellow', labelEn: 'Icteric / Yellowish Sclera (Haridra - hyperbilirubinemia, jaundice)', labelHi: 'पीली आंखें (हरिद्रा - पीलिया, यकृत पित्त प्रकोप)' },
+      { id: 'injected_red', labelEn: 'Congested / Injected Sclera (Rakta - conjunctival injection, burning, gritty)', labelHi: 'लाल आंखें (रक्तज - आंखें लाल होना, जलन, चुभन)' }
+    ]
+  },
+  // 8. Akruti - General Posture & Facies
+  akruti: {
+    nameEn: 'General Posture, Body Habitus & Facies (Akruti)',
+    nameHi: 'आकृति परीक्षा (शारीरिक हाव-भाव व चेहरे की मुद्रा)',
+    options: [
+      { id: 'comfortable_normal', labelEn: 'Comfortable & Normal Facies (Prasanna Vadana - relaxed posture, no distress)', labelHi: 'प्रसन्न व सामान्य मुद्रा (चेहरे पर शांति, कोई कष्ट नहीं)' },
+      { id: 'pain_distress', labelEn: 'Pain Facies / Protective Guarding (Kastam - furrowed brow, grimacing, splinting)', labelHi: 'दर्द व कष्ट का चेहरा (माथे पर सिलवटें, दर्द से सिकुड़ना)' },
+      { id: 'fatigued_exhausted', labelEn: 'Fatigued & Listless (Glani - sunken eyes, drooped shoulders, sluggish response)', labelHi: 'थका हुआ व सुस्त (आंखें धंसी, चेहरे पर कमजोरी)' },
+      { id: 'emaciated_frail', labelEn: 'Cachectic / Frail (Krisha - muscle wasting, temporal hollowing, hunched)', labelHi: 'अत्यधिक दुर्बल (मांसपेशियों का क्षय, कमजोरी)' }
+    ]
+  }
+};
+
 export const AYUSH_PARIKSHA_DATA = {
-  prakritiOptions: [
-    { id: 'vata', labelEn: 'Vata Dominant (Lean frame, dry skin, quick energetic movements, anxiety prone)', labelHi: 'वात प्रधान (पतला शरीर, रूखी त्वचा, चंचलता, चिंता की प्रवृत्ति)' },
-    { id: 'pitta', labelEn: 'Pitta Dominant (Medium build, warm body, sharp intellect, heat intolerant, irritable)', labelHi: 'पित्त प्रधान (मध्यम कद-काठी, शरीर में गर्मी, तेज भूख, गुस्सा जल्दी आना)' },
-    { id: 'kapha', labelEn: 'Kapha Dominant (Broad sturdy build, oily smooth skin, calm demeanor, slow digestion)', labelHi: 'कफ प्रधान (मजबूत भारी शरीर, शांत स्वभाव, गहरी नींद, धीमा पाचन)' },
-    { id: 'dvandvaja', labelEn: 'Dvandvaja (Vata-Pitta or Pitta-Kapha dual combination)', labelHi: 'द्वंद्वज (वात-पित्त या पित्त-कफ मिश्रित प्रकृति)' }
-  ],
-  agniOptions: [
-    { id: 'sama', labelEn: 'Samagni (Healthy balanced digestion, punctual hunger without discomfort)', labelHi: 'समाग्नि (संतुलित पाचन, समय पर सामान्य भूख)' },
-    { id: 'tikshna', labelEn: 'Tikshnagni (Excessively sharp/burning digestion, acidity, frequent hunger)', labelHi: 'तीक्ष्णाग्नि (तेज जलन वाली भूख, अम्लपित्त, भोजन न मिलने पर बेचैनी)' },
-    { id: 'manda', labelEn: 'Mandagni (Weak sluggish digestion, heaviness, no appetite for hours)', labelHi: 'मंदाग्नि (धीमा पाचन, भूख न लगना, खाने के बाद भारीपन)' },
-    { id: 'vishama', labelEn: 'Vishamagni (Erratic/unpredictable appetite, sometimes voracious, sometimes none)', labelHi: 'विषमाग्नि (अनियमित पाचन, कभी तेज भूख कभी बिल्कुल नहीं)' }
-  ],
-  koshthaOptions: [
-    { id: 'mridu', labelEn: 'Mridu Koshtha (Soft laxative bowel, easily irritated by milk/fruits)', labelHi: 'मृदु कोष्ठ (आसानी से पेट साफ होना, दूध या फलों से दस्त की प्रवृत्ति)' },
-    { id: 'madhyama', labelEn: 'Madhyama Koshtha (Normal regular single bowel movement daily)', labelHi: 'मध्यम कोष्ठ (दिन में एक बार सामान्य रूप से शौच होना)' },
-    { id: 'krura', labelEn: 'Krura Koshtha (Hard dry constipation, requires strong stimulants/laxatives)', labelHi: 'क्रूर कोष्ठ (कड़ा मल, कब्ज, शौच में कठिनाई)' }
-  ]
+  prakritiOptions: DASHAVIDHA_PARIKSHA_DATA.prakriti.options,
+  agniOptions: DASHAVIDHA_PARIKSHA_DATA.aharaShakti.options,
+  koshthaOptions: ASHTA_STHANA_PARIKSHA_DATA.mala.options
 };
 
 export const COMMON_CHRONIC_PRESETS = [

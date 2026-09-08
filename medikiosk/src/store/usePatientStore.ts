@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { io } from 'socket.io-client';
 import { supabase } from '../lib/supabase';
 import { type EsiTriageResult } from '../services/clinicalAiService';
+import { type DashavidhaData, type AshtaSthanaData } from '../data/clinicalProtocols';
 
 const socket = io('https://medikiosk-sih-2026.loca.lt', {
   extraHeaders: {
@@ -117,13 +118,15 @@ export interface PatientData {
   relievingFactors: string;
   associatedSymptoms: string[];
 
-  // AYUSH Dashavidha / Ashtavidha Pariksha (Only populated if patient opts into AYUSH)
+  // AYUSH & Integrative Medicine Frameworks (Dashavidha 10-Fold & Ashta Sthana 8-Point)
   prakriti: string;
   agni: string; // Digestive Fire
   koshtha: string; // Bowel Nature
   aharaVihara: string; // Diet & Lifestyle
   nidra: string; // Sleep quality
   ayushResponses?: { qId: string; answer: string; dosha: string }[];
+  dashavidha?: Partial<DashavidhaData>;
+  ashtaSthana?: Partial<AshtaSthanaData>;
 
   // Chronic & Allergies
   chronicConditions: ChronicConditionItem[];
@@ -215,6 +218,7 @@ interface PatientStore {
   triggerQueueUpdate: () => void;
   clearQueue: () => Promise<void>;
   initSocket: () => void;
+  updatePatientIntegrativeExam: (patientToken: string, dashavidha: Partial<DashavidhaData>, ashtaSthana: Partial<AshtaSthanaData>) => void;
 }
 
 const createInitialPatient = (): PatientData => ({
@@ -249,6 +253,28 @@ const createInitialPatient = (): PatientData => ({
   aharaVihara: '',
   nidra: '',
   ayushResponses: [],
+  dashavidha: {
+    prakriti: '',
+    vikriti: '',
+    sara: '',
+    samhanana: '',
+    pramana: '',
+    satmya: '',
+    sattva: '',
+    aharaShakti: '',
+    vyayamaShakti: '',
+    vaya: ''
+  },
+  ashtaSthana: {
+    nadi: '',
+    mutra: '',
+    mala: '',
+    jihwa: '',
+    shabda: '',
+    sparsha: '',
+    druk: '',
+    akruti: ''
+  },
 
   chronicConditions: [],
   allergies: [],
@@ -430,6 +456,28 @@ export const mockDatabase: Record<string, PatientData> = {
     koshtha: 'Krura Koshtha (Vibandha / constipation tendency)',
     aharaVihara: 'Irregular breakfast, excessive tea consumption (5-6 cups/day), late dinners',
     nidra: 'Alpa Nidra (fragmented sleep < 6 hrs)',
+    dashavidha: {
+      prakriti: 'Pitta-Vata Combination (Lean to medium build, sensitive to heat)',
+      vikriti: 'Pitta Imbalance (Hyperacidity, burning sensation, vidaha)',
+      sara: 'Moderate Reserve (Madhyama Sara - average stamina)',
+      samhanana: 'Average Build (Madhyama - balanced skeletal tone)',
+      pramana: 'Proportionate & Symmetrical (Normal BMI: 22.8)',
+      satmya: 'Moderate Adaptability (Sensitive to pungent spices, tea & heat)',
+      sattva: 'Moderate Resilience (Madhyama Sattva - works under stress)',
+      aharaShakti: 'Tikshnagni (Hypermetabolic, intense hunger, acidity)',
+      vyayamaShakti: 'Moderate Endurance (Handles routine work, tires with knee strain)',
+      vaya: 'Madhyama Phase (42 Yrs - active productive adult phase)'
+    },
+    ashtaSthana: {
+      nadi: 'Rapid & Bounding (Manduka/Pitta gati, 78 bpm, warm bounding pulse)',
+      mutra: 'Dark Yellow / Burning (Pitta - concentrated, mild dysuria)',
+      mala: 'Constipated & Hard (Krura - dry, straining required)',
+      jihwa: 'Red Margins with Mild White Coating (Pitta-Sama)',
+      shabda: 'Clear & Resonant (Spashta - normal phonation)',
+      sparsha: 'Warm & Mildly Dry (Ushna-Ruksha - warm palms, dry skin)',
+      druk: 'Clear with Mild Vascular Injection (Rakta/Pitta on strain)',
+      akruti: 'Mild Pain Facies (Kastam - furrowed brow during gastric flare)'
+    },
     chronicConditions: [
       { condition: 'Amlapitta / Dyspepsia', duration: '2 years', medication: 'Occasional Pantoprazole 40mg', status: 'Recurrent' },
       { condition: 'Bilateral Knee Osteoarthritis (Early)', duration: '1 year', medication: 'Calcium + Vit D3', status: 'Mild functional limitation' }
@@ -873,6 +921,37 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
         currentProfile: state.currentProfile && targetPatient && (state.currentProfile.name === targetPatient.name || state.currentProfile.abhaId === targetPatient.abhaId)
           ? { ...state.currentProfile, uploadedDocuments: [doc, ...state.currentProfile.uploadedDocuments] }
           : state.currentProfile,
+        queueTrigger: state.queueTrigger + 1
+      };
+    });
+  },
+
+  updatePatientIntegrativeExam: (patientToken: string, dashavidha: Partial<DashavidhaData>, ashtaSthana: Partial<AshtaSthanaData>) => {
+    let targetPatient = mockDatabase[patientToken];
+    if (!targetPatient) {
+      targetPatient = Object.values(mockDatabase).find(p => p.token === patientToken || p.patientId === patientToken) as PatientData;
+    }
+    if (targetPatient) {
+      targetPatient.dashavidha = { ...(targetPatient.dashavidha || {}), ...dashavidha };
+      targetPatient.ashtaSthana = { ...(targetPatient.ashtaSthana || {}), ...ashtaSthana };
+      if (dashavidha.prakriti) targetPatient.prakriti = dashavidha.prakriti;
+      if (dashavidha.aharaShakti) targetPatient.agni = dashavidha.aharaShakti;
+      if (ashtaSthana.mala) targetPatient.koshtha = ashtaSthana.mala;
+      syncPatientToSupabase(targetPatient);
+    }
+    set((state) => {
+      const isCurrent = state.currentPatient.token === patientToken || state.currentPatient.patientId === patientToken;
+      return {
+        currentPatient: isCurrent
+          ? {
+              ...state.currentPatient,
+              dashavidha: { ...(state.currentPatient.dashavidha || {}), ...dashavidha },
+              ashtaSthana: { ...(state.currentPatient.ashtaSthana || {}), ...ashtaSthana },
+              prakriti: dashavidha.prakriti || state.currentPatient.prakriti,
+              agni: dashavidha.aharaShakti || state.currentPatient.agni,
+              koshtha: ashtaSthana.mala || state.currentPatient.koshtha
+            }
+          : state.currentPatient,
         queueTrigger: state.queueTrigger + 1
       };
     });
