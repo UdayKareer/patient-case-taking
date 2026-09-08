@@ -526,3 +526,117 @@ export const COMMON_ALLERGIES_PRESETS = [
   { allergen: 'Paracetamol', reaction: 'Urticaria / rash', severity: 'mild' as const },
   { allergen: 'Dust Mites & Pollen', reaction: 'Allergic rhinitis, sneezing, wheeze', severity: 'mild' as const }
 ];
+
+export interface NamasteDiagnosisItem {
+  id: string;
+  namasteCode: string;
+  icd11Tm2Code: string;
+  ayushTerm: string;
+  genericTerm: string;
+  category: string;
+  commonDosha: string;
+  recommendedHerbs: string;
+}
+
+export const NAMASTE_ICD11_PRESETS: NamasteDiagnosisItem[] = [
+  {
+    id: 'amlapitta',
+    namasteCode: 'NAM-AYU-DIG-001',
+    icd11Tm2Code: 'AA10',
+    ayushTerm: 'Amlapitta',
+    genericTerm: 'Non-Ulcer Dyspepsia / Gastroesophageal Acid Reflux (GERD)',
+    category: 'Gastrointestinal (Annavaha Srotas)',
+    commonDosha: 'Pitta Dominant',
+    recommendedHerbs: 'Avipattikar Churna 3g BD, Kamadudha Ras 250mg, Tab Pantoprazole 40mg'
+  },
+  {
+    id: 'sandhivata',
+    namasteCode: 'NAM-AYU-MSK-002',
+    icd11Tm2Code: 'AB22',
+    ayushTerm: 'Sandhivata',
+    genericTerm: 'Degenerative Osteoarthritis of Knees / Joints',
+    category: 'Musculoskeletal (Asthivaha Srotas)',
+    commonDosha: 'Vata Dominant',
+    recommendedHerbs: 'Yograj Guggulu 2 tabs BD, Shallaki 500mg, Calcium + Vit D3'
+  },
+  {
+    id: 'kasa',
+    namasteCode: 'NAM-AYU-RES-003',
+    icd11Tm2Code: 'AC04',
+    ayushTerm: 'Kasa',
+    genericTerm: 'Acute Bronchial Cough / Upper Respiratory Tract Infection',
+    category: 'Respiratory (Pranavaha Srotas)',
+    commonDosha: 'Vata-Kapha',
+    recommendedHerbs: 'Sitopaladi Churna 3g with Honey, Vasavaleha, Levocetirizine'
+  },
+  {
+    id: 'shwasa',
+    namasteCode: 'NAM-AYU-RES-004',
+    icd11Tm2Code: 'AC08',
+    ayushTerm: 'Tamaka Shwasa',
+    genericTerm: 'Bronchial Asthma / Reactive Airway Disease',
+    category: 'Respiratory (Pranavaha Srotas)',
+    commonDosha: 'Vata-Kapha',
+    recommendedHerbs: 'Shwaskuthar Ras 125mg, Kantakari Avaleha, Budecort Inhaler'
+  },
+  {
+    id: 'prameha',
+    namasteCode: 'NAM-AYU-MET-005',
+    icd11Tm2Code: 'AD15',
+    ayushTerm: 'Madhumeha (Prameha)',
+    genericTerm: 'Type 2 Diabetes Mellitus / Metabolic Syndrome',
+    category: 'Endocrine & Metabolic (Medovaha Srotas)',
+    commonDosha: 'Kapha-Pitta Dominant',
+    recommendedHerbs: 'Chandraprabha Vati 2 tabs BD, Nishamalaki Churna, Tab Metformin 500mg'
+  },
+  {
+    id: 'raktagata_vata',
+    namasteCode: 'NAM-AYU-CVD-006',
+    icd11Tm2Code: 'AE30',
+    ayushTerm: 'Uccharaktachapa (Raktagata Vata)',
+    genericTerm: 'Essential Systemic Hypertension (Stage 1/2)',
+    category: 'Cardiovascular (Raktavaha Srotas)',
+    commonDosha: 'Vata-Pitta',
+    recommendedHerbs: 'Sarpagandha Ghan Vati 1 tab HS, Arjuna Ksheerapaka, Tab Telmisartan 40mg'
+  },
+  {
+    id: 'shirahshoola',
+    namasteCode: 'NAM-AYU-CNS-007',
+    icd11Tm2Code: 'AF12',
+    ayushTerm: 'Shirahshoola (Ardhavabhedaka)',
+    genericTerm: 'Migraine Headache / Tension Cephalea',
+    category: 'Neurological (Majjavaha Srotas)',
+    commonDosha: 'Vata-Pitta',
+    recommendedHerbs: 'Pathyadi Kwath 20ml BD, Shirashoolavajra Ras, Tab Paracetamol 650mg'
+  },
+  {
+    id: 'grahani',
+    namasteCode: 'NAM-AYU-GAS-008',
+    icd11Tm2Code: 'AA14',
+    ayushTerm: 'Grahani Roga',
+    genericTerm: 'Irritable Bowel Syndrome (IBS) / Chronic Malabsorption',
+    category: 'Gastrointestinal (Purishavaha Srotas)',
+    commonDosha: 'Vata-Pitta-Kapha (Mandagni)',
+    recommendedHerbs: 'Bilwadi Churna 3g with Takra, Kutajghan Vati 2 tabs BD, Probiotics'
+  },
+  {
+    id: 'vicharchika',
+    namasteCode: 'NAM-AYU-DER-009',
+    icd11Tm2Code: 'AG05',
+    ayushTerm: 'Vicharchika (Kushta)',
+    genericTerm: 'Atopic Eczema / Chronic Pruritic Dermatitis',
+    category: 'Dermatological (Rasa-Raktavaha)',
+    commonDosha: 'Kapha-Pitta',
+    recommendedHerbs: 'Khadirarishta 20ml BD, Mahatiktaka Ghrita, Topical Emollient'
+  },
+  {
+    id: 'chittodvega',
+    namasteCode: 'NAM-AYU-PSY-010',
+    icd11Tm2Code: 'AH02',
+    ayushTerm: 'Chittodvega (Manovaha Srotas)',
+    genericTerm: 'Generalized Anxiety Disorder / Chronic Stress & Insomnia',
+    category: 'Neuropsychiatric (Manovaha Srotas)',
+    commonDosha: 'Vata Dominant (Raja Vriddhi)',
+    recommendedHerbs: 'Ashwagandha Churna 3g HS with warm milk, Brahmi Vati 1 tab BD'
+  }
+];

@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { supabase } from '../lib/supabase';
 import { type EsiTriageResult } from '../services/clinicalAiService';
 import { type DashavidhaData, type AshtaSthanaData } from '../data/clinicalProtocols';
+import { offlineSyncService } from '../services/offlineSyncService';
 
 const socket = io('https://medikiosk-sih-2026.loca.lt', {
   extraHeaders: {
@@ -148,6 +149,8 @@ export interface PatientData {
   consentAyush: boolean;
   structuredSummary: StructuredSummary;
   doctorNotes: string;
+  primaryDiagnosis?: string;
+  namasteCode?: string;
   status: 'waiting' | 'in_consultation' | 'accepted' | 'amended' | 'rejected' | 'admitted';
   createdAt: string;
   createdTimestamp?: number;
@@ -303,6 +306,8 @@ const createInitialPatient = (): PatientData => ({
   },
 
   doctorNotes: '',
+  primaryDiagnosis: '',
+  namasteCode: '',
   status: 'waiting',
   createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   hospitalCode: '',
@@ -549,6 +554,8 @@ export const mockDatabase: Record<string, PatientData> = {
       ]
     },
     doctorNotes: '',
+    primaryDiagnosis: 'Amlapitta (Non-Ulcer Dyspepsia / Acid Reflux)',
+    namasteCode: 'NAM-AYU-DIG-001 | ICD-11 TM2: AA10',
     status: 'waiting',
     createdAt: '09:40 AM'
   },
@@ -1236,6 +1243,16 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
 }));
 
 export const syncPatientToSupabase = async (patient: PatientData) => {
+  // Always cache locally in offline storage first
+  offlineSyncService.cacheOfflinePatient(patient.token, patient);
+
+  // If network is currently offline, queue record locally for auto-sync
+  if (!offlineSyncService.isOnline()) {
+    offlineSyncService.enqueue('patient_sync', patient.token, patient);
+    console.log(`[OfflineSync] Network offline: Queued ${patient.token} in local store.`);
+    return;
+  }
+
   try {
     const { error } = await supabase.from('patients').upsert({
       token: patient.token,
@@ -1254,8 +1271,12 @@ export const syncPatientToSupabase = async (patient: PatientData) => {
       ipd_stage: patient.ipdStage,
       data: patient
     });
-    if (error) console.warn('Supabase upsert error:', error.message);
+    if (error) {
+      console.warn('Supabase upsert error, queueing offline:', error.message);
+      offlineSyncService.enqueue('patient_sync', patient.token, patient);
+    }
   } catch (err) {
-    console.warn('Supabase error:', err);
+    console.warn('Supabase network error, queueing offline:', err);
+    offlineSyncService.enqueue('patient_sync', patient.token, patient);
   }
 };

@@ -27,7 +27,8 @@ import {
   Calendar,
   Paperclip,
   Mic,
-  MicOff
+  MicOff,
+  RefreshCw
 } from 'lucide-react';
 import { usePatientStore, mockDatabase, mockProfiles, type PatientData, type IpdMedication, type IpdProgressNote, type UploadedDocument, syncPatientToSupabase } from '../store/usePatientStore';
 import type { DoctorOutletContext } from '../components/DoctorLayout';
@@ -35,6 +36,8 @@ import OPDPrescriptionModal from '../components/OPDPrescriptionModal';
 import DocumentViewerModal from '../components/DocumentViewerModal';
 import { UnifiedVoiceSession, type VoiceState } from '../services/whisperService';
 import { getEsiMetadata, calculateRuleBasedEsi, type EsiTriageResult } from '../services/clinicalAiService';
+import { NAMASTE_ICD11_PRESETS, type NamasteDiagnosisItem } from '../data/clinicalProtocols';
+import { offlineSyncService } from '../services/offlineSyncService';
 
 interface PrescribedMedItem {
   name: string;
@@ -131,7 +134,64 @@ export default function DoctorDashboard() {
 
   const [activeChartTab, setActiveChartTab] = useState<'soap' | 'ocr' | 'ayush' | 'history'>('soap');
   const [doctorNotes, setDoctorNotes] = useState('');
+  const [primaryDiagnosis, setPrimaryDiagnosis] = useState('');
+  const [namasteCode, setNamasteCode] = useState('');
+  const [showNamastePicker, setShowNamastePicker] = useState(false);
+  const [isNetworkOnline, setIsNetworkOnline] = useState(offlineSyncService.isOnline());
+  const [offlinePendingCount, setOfflinePendingCount] = useState(offlineSyncService.getPendingCount());
+  const [isSyncingOffline, setIsSyncingOffline] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+
+  // Subscribe to offline sync engine for real-time network connectivity and pending queue count
+  useEffect(() => {
+    const unsub = offlineSyncService.subscribe((online, count) => {
+      setIsNetworkOnline(online);
+      setOfflinePendingCount(count);
+    });
+    return () => unsub();
+  }, []);
+
+  // Synchronize diagnosis and NAMASTE code when active patient changes
+  useEffect(() => {
+    setPrimaryDiagnosis(selectedPatient.primaryDiagnosis || '');
+    setNamasteCode(selectedPatient.namasteCode || '');
+  }, [selectedPatient.token, selectedPatient.primaryDiagnosis, selectedPatient.namasteCode]);
+
+  const handleSelectNamasteDiagnosis = (item: NamasteDiagnosisItem) => {
+    const fullDiag = `${item.ayushTerm} (${item.genericTerm})`;
+    const fullCode = `${item.ayushTerm} [NAMASTE: ${item.namasteCode} | ICD-11 TM2: ${item.icd11Tm2Code}]`;
+    setPrimaryDiagnosis(fullDiag);
+    setNamasteCode(fullCode);
+    setShowNamastePicker(false);
+
+    const updated: PatientData = {
+      ...selectedPatient,
+      primaryDiagnosis: fullDiag,
+      namasteCode: fullCode
+    };
+    setSelectedPatient(updated);
+    if (mockDatabase[updated.token]) {
+      mockDatabase[updated.token] = updated;
+    }
+    syncPatientToSupabase(updated);
+    setStatusMessage(`✅ NAMASTE Code linked: ${item.namasteCode} (ICD-11 TM2: ${item.icd11Tm2Code})`);
+    setTimeout(() => setStatusMessage(''), 3500);
+  };
+
+  const handleManualOfflineSync = async () => {
+    setIsSyncingOffline(true);
+    setStatusMessage('🔄 Syncing offline records with cloud database...');
+    try {
+      const { synced } = await offlineSyncService.syncPendingQueue();
+      setStatusMessage(`✅ Successfully synchronized ${synced} offline patient records to Supabase.`);
+    } catch (e: any) {
+      setStatusMessage('⚠️ Sync completed with some errors: ' + (e?.message || 'Check connection'));
+    } finally {
+      setIsSyncingOffline(false);
+      setTimeout(() => setStatusMessage(''), 4000);
+    }
+  };
+
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [queueFilter, setQueueFilter] = useState<'all' | 'emergency' | 'ayush' | 'waiting' | 'relieved'>('all');
   const [sortBy, setSortBy] = useState<'longest_wait' | 'newest' | 'acuity'>('longest_wait');
@@ -414,6 +474,8 @@ export default function DoctorDashboard() {
     setSelectedPatient(patient);
     setSearchToken(patient.token);
     setDoctorNotes(patient.doctorNotes || '');
+    setPrimaryDiagnosis(patient.primaryDiagnosis || '');
+    setNamasteCode(patient.namasteCode || '');
     setPrescribedMeds([]); // Reset prescription pad for new patient
     setStatusMessage('');
     if (activeTab !== 'consultation') {
@@ -484,7 +546,9 @@ export default function DoctorDashboard() {
     const updated: PatientData = {
       ...selectedPatient,
       status: 'accepted',
-      doctorNotes
+      doctorNotes,
+      primaryDiagnosis: primaryDiagnosis || selectedPatient.primaryDiagnosis,
+      namasteCode: namasteCode || selectedPatient.namasteCode,
     };
     if (mockDatabase[updated.token]) {
       mockDatabase[updated.token] = updated;
@@ -775,6 +839,46 @@ export default function DoctorDashboard() {
           </button>
         </div>
       )}
+
+      {/* Network Connectivity & Offline Sync Status Bar (Rural Health Center Resilient Engine) */}
+      <div className={`p-2.5 px-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs ${
+        isNetworkOnline 
+          ? offlinePendingCount > 0 
+            ? 'bg-amber-50 border-amber-200 text-amber-900' 
+            : 'bg-emerald-50/80 border-emerald-200 text-emerald-900' 
+          : 'bg-amber-100 border-amber-300 text-amber-950 font-medium'
+      }`}>
+        <div className="flex items-center gap-2">
+          <span className={`w-2.5 h-2.5 rounded-full ${isNetworkOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-600'}`} />
+          <span>
+            {isNetworkOnline ? (
+              <>
+                <strong className="font-bold">Cloud HIS Online (ABDM / Supabase)</strong>
+                {offlinePendingCount > 0 ? ` • ${offlinePendingCount} offline pending update(s) ready to sync` : ' • All records synchronized'}
+              </>
+            ) : (
+              <>
+                <strong className="font-bold">⚠️ Rural Offline Mode Active:</strong> Operating from local encrypted storage. All consultations, NAMASTE codes & prescriptions saved locally.
+              </>
+            )}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {offlinePendingCount > 0 && (
+            <button
+              onClick={handleManualOfflineSync}
+              disabled={isSyncingOffline || !isNetworkOnline}
+              className="px-2.5 py-1 bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-white text-[11px] font-bold rounded-md flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+            >
+              <RefreshCw size={11} className={isSyncingOffline ? 'animate-spin' : ''} />
+              {isSyncingOffline ? 'Syncing...' : `Sync Queue (${offlinePendingCount})`}
+            </button>
+          )}
+          <span className="text-[10px] text-slate-500 font-mono">
+            {isNetworkOnline ? 'Direct Cloud Sync' : 'Auto-Sync on Reconnect'}
+          </span>
+        </div>
+      </div>
 
       {/* OPD KPI Ticker Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -2227,6 +2331,118 @@ export default function DoctorDashboard() {
                         </ul>
                       </div>
                     )}
+
+                    {/* Standardized Primary Diagnosis & NAMASTE / WHO ICD-11 TM2 Coding Card (SIH 26047) */}
+                    <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-xs">
+                            🌿
+                          </span>
+                          <div>
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                              Clinical Diagnosis & Standardized Morbidity
+                              <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                                NAMASTE & ICD-11 TM2
+                              </span>
+                            </h4>
+                            <p className="text-[10px] text-slate-400">Standardized Ayush Morbidity bridged with Dual Generic Allopathic classification</p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowNamastePicker(!showNamastePicker)}
+                          className="px-2.5 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span>{showNamastePicker ? 'Close Directory' : '📖 Browse Morbidity Directory'}</span>
+                        </button>
+                      </div>
+
+                      {/* Searchable Preset Directory Drawer */}
+                      {showNamastePicker && (
+                        <div className="p-3 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-2.5 animate-fade-in text-xs">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-emerald-950">
+                            <span>Select Standardized Morbidity Preset (Ayush + Generic Dual Terminology):</span>
+                            <span className="text-[10px] text-slate-500 font-normal">Click any card to apply</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                            {NAMASTE_ICD11_PRESETS.map((item) => (
+                              <button
+                                key={item.namasteCode}
+                                type="button"
+                                onClick={() => handleSelectNamasteDiagnosis(item)}
+                                className="text-left p-2.5 bg-white hover:bg-emerald-50 border border-emerald-100 hover:border-emerald-300 rounded-xl transition-all shadow-2xs group cursor-pointer"
+                              >
+                                <div className="flex items-center justify-between text-slate-900 font-bold text-xs">
+                                  <span className="group-hover:text-emerald-800">{item.ayushTerm}</span>
+                                  <span className="text-[9px] font-mono font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                    {item.namasteCode}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-slate-600 font-medium mt-0.5">
+                                  Generic: <span className="font-semibold text-slate-800">{item.genericTerm}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                                  <span>ICD-11: <strong className="font-mono text-slate-600">{item.icd11Tm2Code}</strong></span>
+                                  <span className="text-teal-600 font-medium">{item.category}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Active Diagnosis & NAMASTE Code Fields */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                            Primary Diagnosis (Provisional / Final)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Amlapitta (Non-Ulcer Hyperacidity)"
+                            value={primaryDiagnosis}
+                            onChange={(e) => {
+                              setPrimaryDiagnosis(e.target.value);
+                              setSelectedPatient({ ...selectedPatient, primaryDiagnosis: e.target.value });
+                            }}
+                            className="w-full px-3 py-1.5 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 focus:ring-1 focus:ring-teal-600 outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                            NAMASTE & WHO ICD-11 TM2 Classification Code
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Amlapitta [NAM-AYU-DIG-001 | ICD-11 TM2: AA10]"
+                            value={namasteCode}
+                            onChange={(e) => {
+                              setNamasteCode(e.target.value);
+                              setSelectedPatient({ ...selectedPatient, namasteCode: e.target.value });
+                            }}
+                            className="w-full px-3 py-1.5 bg-slate-50 focus:bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-teal-800 focus:ring-1 focus:ring-teal-600 outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quick Diagnosis Chips */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <span className="text-[10px] font-bold text-slate-400 mr-1">Quick Select:</span>
+                        {NAMASTE_ICD11_PRESETS.slice(0, 5).map((item) => (
+                          <button
+                            key={item.namasteCode}
+                            type="button"
+                            onClick={() => handleSelectNamasteDiagnosis(item)}
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 hover:bg-emerald-100 hover:text-emerald-900 text-slate-700 transition-colors border border-slate-200 cursor-pointer"
+                          >
+                            {item.ayushTerm} ({item.genericTerm})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   {/* P - PLAN & INTERACTIVE RX ORDER PAD */}
