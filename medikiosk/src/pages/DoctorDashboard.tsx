@@ -507,11 +507,6 @@ export default function DoctorDashboard() {
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Avg Consult Duration</div>
           <div className="text-xl font-black text-emerald-600 mt-0.5">2.8 <span className="text-[11px] font-normal text-slate-400">min (was 15m)</span></div>
         </div>
-
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs col-span-2 sm:col-span-1">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Time Saved Today</div>
-          <div className="text-xl font-black text-teal-700 mt-0.5">82% <span className="text-[11px] font-normal text-teal-600">Efficiency</span></div>
-        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -673,7 +668,7 @@ export default function DoctorDashboard() {
               </div>
               <div>
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">Emergency Resuscitation & Triage Bay</h2>
-                <p className="text-xs text-slate-500">Immediate clinical alerts flagged by MediKiosk AI intake engine</p>
+                <p className="text-xs text-slate-500">Immediate clinical alerts flagged by MediKiosk Intake System</p>
               </div>
             </div>
             <span className="px-3 py-1 rounded-full bg-red-100 text-red-800 font-bold text-xs uppercase animate-pulse">
@@ -1344,7 +1339,7 @@ export default function DoctorDashboard() {
                   }`}
                 >
                   <FileText size={15} />
-                  <span>AI Clinical Synthesis & SOAP Note</span>
+                  <span>Clinical Synthesis & SOAP Note</span>
                 </button>
 
                 <button
@@ -1638,7 +1633,7 @@ export default function DoctorDashboard() {
                         A
                       </span>
                       <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-900">
-                        Assessment & AI Differential Triage
+                        Assessment & Differential Triage
                       </h3>
                     </div>
 
@@ -1668,9 +1663,6 @@ export default function DoctorDashboard() {
                               <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
                                 ESI Level {activeEsi.level} — {activeEsi.category}
                               </h4>
-                              <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                                {activeEsi.algorithmSource === 'gemini-3.5-flash-lite' ? 'Gemini 3.5 AI Engine' : 'Clinical Rule Engine'}
-                              </span>
                             </div>
                             <p className="text-[11px] text-slate-500">Emergency Severity Index 5-Tier Acuity Protocol</p>
                           </div>
@@ -1813,7 +1805,7 @@ export default function DoctorDashboard() {
                     {/* Suggested Provisional Workup */}
                     {selectedPatient.structuredSummary?.suggestedWorkup && (
                       <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-                        <span className="font-bold text-slate-700 block mb-1.5">Recommended Workup (AI Provisional):</span>
+                        <span className="font-bold text-slate-700 block mb-1.5">Recommended Provisional Workup:</span>
                         <ul className="list-disc list-inside space-y-1 text-slate-600">
                           {selectedPatient.structuredSummary.suggestedWorkup.map((w, idx) => (
                             <li key={idx}>{w}</li>
@@ -1996,7 +1988,7 @@ export default function DoctorDashboard() {
               {activeChartTab === 'ocr' && (
                 <div className="p-6 space-y-4">
                   <h3 className="text-sm font-bold text-slate-900">Scanned Historical Prescriptions & Lab Records</h3>
-                  <p className="text-xs text-slate-500">AI extracts diagnosis entities, dosage schedules, and highlights abnormal values</p>
+                  
                   
                   {selectedPatient.uploadedDocuments.map((doc) => (
                     <div key={doc.id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50 space-y-3">
