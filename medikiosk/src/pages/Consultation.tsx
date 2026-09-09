@@ -413,8 +413,13 @@ export default function Consultation() {
 
         const shouldAutoRoute = !currentPatient.assignedDept || 
           currentPatient.assignedDept === 'AI Auto-Routing' || 
+          currentPatient.assignedDept === 'Auto-Allocated' ||
+          currentPatient.assignedDept === 'General Medicine OPD' ||
+          currentPatient.assignedDept === 'Integrative AYUSH OPD' ||
           currentPatient.assignedDept === 'General Medicine' ||
           currentPatient.assignedRoom === 'AI Auto-Routing' ||
+          currentPatient.assignedRoom === 'OPD Room Pending Triage' ||
+          currentPatient.assignedRoom === 'OPD Desk' ||
           !currentPatient.assignedRoom;
 
         updatePatient({

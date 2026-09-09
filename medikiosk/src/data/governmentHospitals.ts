@@ -458,7 +458,7 @@ export function aiRecognizeDepartment(
       assignedDept: bestMatch.dept,
       assignedRoom: bestMatch.room,
       doctorNumber: `${bestMatch.room} (${bestMatch.doctor})`,
-      reasoning: `AI Clinical Analysis matched symptoms to ${bestMatch.dept} (${bestMatch.room}).`
+      reasoning: `Clinical triage matched symptoms to ${bestMatch.dept} (${bestMatch.room}).`
     };
   }
 
