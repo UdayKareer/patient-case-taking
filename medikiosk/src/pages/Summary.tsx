@@ -4,9 +4,11 @@ import {
   CheckCircle2,
   ArrowRight,
   MapPin,
-  Clock
+  Clock,
+  Building2
 } from 'lucide-react';
 import { usePatientStore } from '../store/usePatientStore';
+import { aiRecognizeDepartment } from '../data/governmentHospitals';
 
 export default function Summary() {
   const navigate = useNavigate();
@@ -20,7 +22,14 @@ export default function Summary() {
   const isHindi = currentPatient.language === 'hi';
   
   // Determine OPD Department and Room based on AI Triage rules in real-time
-  const [routingInfo, setRoutingInfo] = useState({ dept: 'General Medicine OPD', room: 'Room 101' });
+  const [routingInfo, setRoutingInfo] = useState({ 
+    dept: currentPatient.assignedDept && currentPatient.assignedDept !== 'AI Auto-Routing' 
+      ? currentPatient.assignedDept 
+      : 'General Medicine & OPD Triage', 
+    room: currentPatient.assignedRoom && currentPatient.assignedRoom !== 'AI Auto-Routing'
+      ? currentPatient.assignedRoom
+      : 'OPD Room 14' 
+  });
 
   useEffect(() => {
     // Re-evaluate to get the latest triage level
@@ -29,42 +38,44 @@ export default function Summary() {
   }, [evaluateTriageAndSummary, saveToDatabase]);
 
   useEffect(() => {
-    // Generate routing based on chief complaint text
+    // If patient already has assigned department from intake, use that directly
+    if (
+      currentPatient.assignedDept && 
+      currentPatient.assignedDept !== 'AI Auto-Routing' &&
+      currentPatient.assignedRoom &&
+      currentPatient.assignedRoom !== 'AI Auto-Routing'
+    ) {
+      setRoutingInfo({ 
+        dept: currentPatient.assignedDept, 
+        room: currentPatient.assignedRoom 
+      });
+      return;
+    }
+
+    // Otherwise, generate routing via AI clinical department recognition
     const textToScan = `${currentPatient.chiefComplaint} ${currentPatient.chiefComplaintHi}`.toLowerCase();
-    
-    let dept = 'General Medicine OPD';
-    let room = 'Room 101, Ground Floor';
-    
-    if (textToScan.includes('chest') || textToScan.includes('सीने') || textToScan.includes('heart')) {
-      dept = 'Cardiology OPD';
-      room = 'Room 204, 2nd Floor';
-    } else if (textToScan.includes('bone') || textToScan.includes('joint') || textToScan.includes('pain') || textToScan.includes('घुटनों') || textToScan.includes('हड्डी')) {
-      dept = 'Orthopedics OPD';
-      room = 'Room 112, 1st Floor';
-    } else if (textToScan.includes('stomach') || textToScan.includes('abdomen') || textToScan.includes('पेट')) {
-      dept = 'Gastroenterology OPD';
-      room = 'Room 305, 3rd Floor';
-    }
+    const routed = aiRecognizeDepartment(
+      textToScan,
+      currentPatient.mode,
+      currentPatient.triageLevel,
+      currentPatient.hospitalCode || 'aiims-delhi',
+      Number(currentPatient.age) || undefined
+    );
 
-    if (currentPatient.mode === 'ayush') {
-      dept = 'AYUSH / Ayurveda Department';
-      room = 'Room 401, Heritage Wing';
-    }
-
-    setRoutingInfo({ dept, room });
-  }, [currentPatient.chiefComplaint, currentPatient.chiefComplaintHi, currentPatient.mode]);
+    setRoutingInfo({ dept: routed.assignedDept, room: routed.assignedRoom });
+  }, [currentPatient.chiefComplaint, currentPatient.chiefComplaintHi, currentPatient.mode, currentPatient.assignedDept, currentPatient.assignedRoom, currentPatient.hospitalCode, currentPatient.triageLevel, currentPatient.age]);
 
   const handleReturnToDashboard = () => {
-    // We simulate recording the visit to the profile
+    // Record the completed visit to the patient profile
     if (currentProfile) {
       updateProfile({
         pastVisits: [
           {
             date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-            hospital: 'City Hospital',
+            hospital: currentPatient.hospitalName || 'AIIMS New Delhi (Apex)',
             department: routingInfo.dept,
-            reason: currentPatient.chiefComplaint || 'Consultation',
-            doctorNotesHidden: 'Pending doctor review.'
+            reason: currentPatient.chiefComplaint || 'Clinical OPD Consultation',
+            doctorNotesHidden: `OPD Token #${currentPatient.token} assigned to ${routingInfo.room}. Pending doctor verification.`
           },
           ...currentProfile.pastVisits
         ]
@@ -133,6 +144,11 @@ export default function Summary() {
         {/* OPD Routing Box */}
         <div className="mt-6 p-6 rounded-xl bg-slate-50/80 border border-slate-200/80 text-slate-900 text-center">
           <div className="flex flex-col items-center justify-center">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-900 bg-blue-50/90 px-3 py-1 rounded-full border border-blue-200/80 mb-3 shadow-2xs">
+              <Building2 size={13} className="text-blue-600" />
+              <span>{currentPatient.hospitalName || 'AIIMS New Delhi (Apex)'}</span>
+            </div>
+            
             <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center mb-2.5">
               <MapPin size={18} />
             </div>

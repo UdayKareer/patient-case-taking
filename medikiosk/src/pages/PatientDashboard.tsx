@@ -24,19 +24,49 @@ import {
   Calendar,
   Building2,
   ShieldCheck,
-  RotateCcw
+  RotateCcw,
+  Sparkles,
+  Search,
+  X
 } from 'lucide-react';
+import { 
+  TOP_GOVERNMENT_HOSPITALS, 
+  getHospitalByCode, 
+  DEFAULT_HOSPITAL, 
+  type GovernmentHospital 
+} from '../data/governmentHospitals';
 
 export default function PatientDashboard() {
   const navigate = useNavigate();
   const { currentProfile, updateProfile, logoutProfile, setMode, updatePatient, currentPatient, resetPatient, resetDemoSession, loginProfile } = usePatientStore();
   
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'documents' | 'profile'>('home');
-  const [hospitalCode, setHospitalCode] = useState(currentPatient.hospitalCode || 'AIIMS-DEL');
-  const [doctorNumber, setDoctorNumber] = useState(currentPatient.doctorNumber || 'OPD Room 14 (Dr. Verma)');
+  const [selectedHospital, setSelectedHospital] = useState<GovernmentHospital>(() => {
+    return getHospitalByCode(currentPatient.hospitalCode) || DEFAULT_HOSPITAL;
+  });
+  const [showHospitalModal, setShowHospitalModal] = useState(false);
+  const [hospitalSearch, setHospitalSearch] = useState('');
+  const [hospitalFilter, setHospitalFilter] = useState<string>('All');
+  const [isManualRoomOverride, setIsManualRoomOverride] = useState(false);
+  const [selectedManualRoom, setSelectedManualRoom] = useState(
+    currentPatient.doctorNumber || 'OPD Room 14 (Dr. Arvind Sharma)'
+  );
   const [showQrModal, setShowQrModal] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [forceNewConsultation, setForceNewConsultation] = useState(false);
+
+  // Filter hospitals by search text and category
+  const filteredHospitals = TOP_GOVERNMENT_HOSPITALS.filter((h) => {
+    const matchesCategory = hospitalFilter === 'All' || h.category === hospitalFilter;
+    const q = hospitalSearch.toLowerCase().trim();
+    const matchesSearch = !q || 
+      h.name.toLowerCase().includes(q) || 
+      h.city.toLowerCase().includes(q) || 
+      h.state.toLowerCase().includes(q) || 
+      h.shortCode.toLowerCase().includes(q) || 
+      h.address.toLowerCase().includes(q);
+    return matchesCategory && matchesSearch;
+  });
 
   // Profile Edit State
   const [newCondition, setNewCondition] = useState({ condition: '', medication: '' });
@@ -109,14 +139,23 @@ export default function PatientDashboard() {
   };
 
   const handleStartConsult = (mode: 'modern' | 'ayush') => {
-    if (!hospitalCode.trim()) {
-      alert('Please enter a Hospital Code first (e.g. AIIMS-DEL)');
-      return;
-    }
     setMode(mode);
+    const assignedDept = isManualRoomOverride 
+      ? selectedHospital.defaultRooms.find(r => selectedManualRoom.includes(r.room))?.dept || (mode === 'ayush' ? 'Integrative AYUSH OPD' : 'General Medicine OPD')
+      : 'AI Auto-Routing';
+    const assignedRoom = isManualRoomOverride 
+      ? selectedManualRoom.split('(')[0].trim() 
+      : 'AI Auto-Routing';
+    const doctorNumber = isManualRoomOverride 
+      ? selectedManualRoom 
+      : 'AI Auto-Routing (Room Pending Triage)';
+
     updatePatient({ 
-      hospitalCode: hospitalCode.trim(),
-      doctorNumber: doctorNumber.trim() || 'OPD Room 14 (Dr. Verma)',
+      hospitalCode: selectedHospital.shortCode,
+      hospitalName: selectedHospital.name,
+      doctorNumber,
+      assignedDept,
+      assignedRoom,
       status: 'waiting' 
     });
     setForceNewConsultation(false);
@@ -474,63 +513,123 @@ export default function PatientDashboard() {
               /* 2. CHECK-IN / START CONSULTATION FORM */
               <div className="space-y-6">
                 <div>
-                  <h1 className="text-xl font-bold text-slate-900">Hospital Check-in & Consultation</h1>
+                  <h1 className="text-xl font-bold text-slate-900">Hospital Check-in & OPD Intake</h1>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Scan the QR code at the OPD desk or enter hospital & doctor room details.
+                    Select your government hospital. Our Clinical AI will automatically recognize your department and route your OPD room during symptom intake.
                   </p>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {/* Hospital Code */}
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-slate-700 uppercase tracking-wider block">
-                        Hospital Code or Name
+                <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                  {/* Hospital Selector Strip */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                        Hospital
                       </label>
-                      <div className="relative">
-                        <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                        <input
-                          type="text"
-                          value={hospitalCode}
-                          onChange={(e) => setHospitalCode(e.target.value)}
-                          placeholder="e.g. AIIMS-DEL or City Hospital"
-                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 rounded-lg border border-slate-200 text-xs font-medium placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 transition-all outline-none"
-                        />
-                      </div>
+                      <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <ShieldCheck size={11} className="text-emerald-600" /> ABDM Registry: {selectedHospital.hfrId}
+                      </span>
                     </div>
 
-                    {/* Doctor / Reception Desk Number */}
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-slate-700 uppercase tracking-wider block">
-                        Doctor / OPD Room Number
-                      </label>
-                      <input
-                        type="text"
-                        value={doctorNumber}
-                        onChange={(e) => setDoctorNumber(e.target.value)}
-                        placeholder="e.g. OPD Room 14 (Dr. Verma)"
-                        className="w-full px-3.5 py-2.5 bg-slate-50/70 hover:bg-slate-50 rounded-lg border border-slate-200 text-xs font-medium placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 transition-all outline-none"
-                      />
+                    <div className="p-4 rounded-xl bg-slate-50/90 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                          <Building2 size={20} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                              {selectedHospital.name}
+                            </h3>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100/80 text-blue-900 border border-blue-200">
+                              {selectedHospital.category}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {selectedHospital.address} • Code: <span className="font-mono font-bold text-slate-700">{selectedHospital.shortCode}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => setShowHospitalModal(true)}
+                          className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                        >
+                          <Building2 size={13} className="text-blue-600" />
+                          <span>Change Hospital</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowQrModal(true)}
+                          className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+                          title="Scan desk QR code at reception"
+                        >
+                          <QrCode size={14} />
+                        </button>
+                      </div>
                     </div>
                   </div>
 
-                  {/* QR Scan Button */}
-                  <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
-                    <span className="text-xs text-slate-500">
-                      Present at reception or OPD counter? Scan desk QR to auto-populate.
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowQrModal(true)}
-                      className="w-full sm:w-auto px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg flex items-center justify-center gap-1.5 font-medium text-xs transition-colors shadow-2xs"
-                    >
-                      <QrCode size={14} /> Scan Desk QR
-                    </button>
+                  {/* AI Smart Department Recognition & Room Routing (Built for Rural Patients) */}
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50/70 to-indigo-50/60 border border-blue-200/80 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                          <Sparkles size={13} />
+                        </div>
+                        <span className="text-xs font-bold text-blue-950 uppercase tracking-wide">
+                          AI Smart Department & Room Routing (Active)
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-200">
+                        Zero Medical Jargon Needed
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-blue-900/90 leading-relaxed font-normal">
+                      Rural and general patients do not need to choose complex medical departments. Simply describe your symptoms during intake; our Clinical AI automatically recognizes the right department (e.g. General Medicine, AYUSH, Cardiology, Orthopedics, or Emergency) and assigns your OPD room and queue.
+                    </p>
+
+                    <div className="pt-2 border-t border-blue-100/80 flex items-center justify-between text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setIsManualRoomOverride(!isManualRoomOverride)}
+                        className="text-[11px] font-semibold text-blue-700 hover:text-blue-900 underline flex items-center gap-1 cursor-pointer"
+                      >
+                        {isManualRoomOverride ? '✓ Using Manual Department Selection (Click to Re-enable AI Routing)' : '⚙️ Have a paper doctor/room slip? (Optional Manual Override)'}
+                      </button>
+                    </div>
+
+                    {isManualRoomOverride && (
+                      <div className="pt-2.5 space-y-2 animate-fade-in border-t border-blue-200/60">
+                        <label className="text-[11px] font-bold text-slate-700 block">
+                          Select Specific OPD Department / Room for {selectedHospital.name}:
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {selectedHospital.defaultRooms.map((r, rIdx) => (
+                            <button
+                              key={rIdx}
+                              type="button"
+                              onClick={() => setSelectedManualRoom(`${r.room} (${r.doctor})`)}
+                              className={`p-2.5 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                                selectedManualRoom.includes(r.room)
+                                  ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-2xs'
+                                  : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-200'
+                              }`}
+                            >
+                              <div className="font-bold">{r.dept}</div>
+                              <div className="text-[11px] opacity-90">{r.room} • {r.doctor}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Consultation Mode Options */}
-                {hospitalCode.trim() && (
                   <div className="space-y-2.5">
                     <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                       Select Department Clinical Stream:
@@ -571,7 +670,6 @@ export default function PatientDashboard() {
                       </button>
                     </div>
                   </div>
-                )}
               </div>
             )}
           </div>
@@ -985,8 +1083,8 @@ export default function PatientDashboard() {
               onClick={() => {
                 setIsScanning(true);
                 setTimeout(() => {
-                  setHospitalCode('AIIMS-DEL');
-                  setDoctorNumber('OPD Room 14 (Dr. R. Verma)');
+                  setSelectedHospital(DEFAULT_HOSPITAL);
+                  setSelectedManualRoom('OPD Room 14 (Dr. Arvind Sharma)');
                   setIsScanning(false);
                   setShowQrModal(false);
                 }, 700);
@@ -995,6 +1093,120 @@ export default function PatientDashboard() {
             >
               {isScanning ? 'Verifying Reception QR...' : 'Simulate Scan Reception QR'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* GOVERNMENT HOSPITAL PICKER MODAL */}
+      {showHospitalModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <Building2 className="text-blue-600" size={18} />
+                  <span>Select Government Hospital</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Choose from recognized Central Apex Institutes, Government Medical Colleges & National AYUSH Centers
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHospitalModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Search & Category Filter Pills */}
+            <div className="p-4 border-b border-slate-100 space-y-3 bg-slate-50/60">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                <input
+                  type="text"
+                  value={hospitalSearch}
+                  onChange={(e) => setHospitalSearch(e.target.value)}
+                  placeholder="Search by hospital name, city (e.g. Delhi, Rishikesh, Jaipur), or code..."
+                  className="w-full pl-10 pr-4 py-2 bg-white rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                {['All', 'Central Apex Institute', 'Central Govt Hospital', 'National Apex AYUSH Institute'].map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setHospitalFilter(cat)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors cursor-pointer ${
+                      hospitalFilter === cat
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Hospitals List */}
+            <div className="p-4 overflow-y-auto space-y-2.5 flex-1 divide-y divide-slate-100">
+              {filteredHospitals.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  No hospitals matched your search query. Try another city or name.
+                </div>
+              ) : (
+                filteredHospitals.map((h) => (
+                  <div
+                    key={h.id}
+                    onClick={() => {
+                      setSelectedHospital(h);
+                      setSelectedManualRoom(`${h.defaultRooms[0]?.room} (${h.defaultRooms[0]?.doctor})`);
+                      setShowHospitalModal(false);
+                    }}
+                    className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between gap-3 ${
+                      selectedHospital.id === h.id
+                        ? 'border-blue-500 bg-blue-50/50 shadow-2xs'
+                        : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                        selectedHospital.id === h.id ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        <Building2 size={18} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-extrabold text-slate-900 text-xs sm:text-sm">{h.name}</span>
+                          <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200">
+                            {h.city}, {h.state}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {h.address} • Code: <span className="font-mono font-bold text-slate-700">{h.shortCode}</span>
+                        </p>
+                        <span className="text-[10px] text-emerald-700 font-semibold mt-1 inline-block">
+                          ABDM Registry: {h.hfrId} • {h.defaultRooms.length} OPD Clinics Available
+                        </span>
+                      </div>
+                    </div>
+
+                    {selectedHospital.id === h.id ? (
+                      <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2.5 py-1 rounded-full shrink-0">
+                        Selected
+                      </span>
+                    ) : (
+                      <span className="text-xs font-semibold text-slate-400 hover:text-blue-600 shrink-0">
+                        Select &rarr;
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}

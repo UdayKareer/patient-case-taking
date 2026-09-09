@@ -9,10 +9,10 @@ import {
   CheckCircle2,
   Leaf,
   Sparkles,
-  MapPin,
   Stethoscope,
   Camera,
-  Paperclip
+  Paperclip,
+  Building2
 } from 'lucide-react';
 import { usePatientStore, type UploadedDocument } from '../store/usePatientStore';
 import {
@@ -34,6 +34,7 @@ import {
   type DynamicQuestion,
   type DynamicQuestionOption
 } from '../services/clinicalAiService';
+import { aiRecognizeDepartment } from '../data/governmentHospitals';
 
 export default function Consultation() {
   const navigate = useNavigate();
@@ -391,13 +392,40 @@ export default function Consultation() {
           triageLevel: currentPatient.triageLevel
         });
 
-        const computedTriage: 'emergency' | 'priority' | 'normal' =
+        let computedTriage: 'emergency' | 'priority' | 'normal' =
           esiResult.level <= 2 ? 'emergency' : esiResult.level === 3 ? 'priority' : 'normal';
+
+        // AI Clinical Department Recognition & Room Routing
+        const fullSymptomsText = [
+          chiefComplaintText,
+          site,
+          character,
+          ...finalAssociated
+        ].filter(Boolean).join(' ');
+
+        const routed = aiRecognizeDepartment(
+          fullSymptomsText,
+          currentPatient.mode,
+          computedTriage,
+          currentPatient.hospitalCode || 'aiims-delhi',
+          Number(currentPatient.age) || undefined
+        );
+
+        const shouldAutoRoute = !currentPatient.assignedDept || 
+          currentPatient.assignedDept === 'AI Auto-Routing' || 
+          currentPatient.assignedDept === 'General Medicine' ||
+          currentPatient.assignedRoom === 'AI Auto-Routing' ||
+          !currentPatient.assignedRoom;
 
         updatePatient({
           esiTriage: esiResult,
           triageLevel: computedTriage,
-          redFlags: detectedRedFlags
+          redFlags: detectedRedFlags,
+          ...(shouldAutoRoute && routed ? {
+            assignedDept: routed.assignedDept,
+            assignedRoom: routed.assignedRoom,
+            doctorNumber: routed.doctorNumber
+          } : {})
         });
       } catch (err) {
         console.warn('ESI calculation error:', err);
@@ -467,8 +495,8 @@ export default function Consultation() {
         <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-2.5">
           <div className="flex items-center gap-2">
             <span className="text-blue-700 bg-blue-50/80 px-2.5 py-0.5 rounded-md border border-blue-200/70 font-semibold flex items-center gap-1">
-              <MapPin size={11} />
-              {currentPatient.hospitalCode || 'HOSP-OPD'} • {currentPatient.doctorNumber || 'OPD Desk'}
+              <Building2 size={11} />
+              {currentPatient.hospitalName || currentPatient.hospitalCode || 'AIIMS New Delhi (Apex)'}
             </span>
             <span className="text-slate-300">•</span>
             <span className="text-slate-600 font-medium">

@@ -89,7 +89,7 @@ export default function DoctorSidebar({ activeTab, setActiveTab, onLogout }: Doc
               </span>
             </div>
             <p className="text-[11px] text-slate-400 flex items-center gap-1">
-              <Building2 size={11} className="text-slate-500" /> AIIMS Apex • OPD Room #14
+              <Building2 size={11} className="text-slate-500" /> {currentPatient.hospitalName || 'AIIMS New Delhi (Apex)'}
             </p>
           </div>
         </div>

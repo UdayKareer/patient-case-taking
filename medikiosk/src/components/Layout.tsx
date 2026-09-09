@@ -24,7 +24,7 @@ export default function Layout() {
               </span>
             </div>
             <p className="text-xs text-slate-500 font-normal hidden sm:block">
-              Clinical Intake & Triage Platform • AIIMS OPD
+              Clinical Intake & Triage Platform • {currentPatient.hospitalName || 'National Health OPD'}
             </p>
           </div>
         </div>

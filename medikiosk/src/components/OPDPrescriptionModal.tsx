@@ -68,13 +68,13 @@ export default function OPDPrescriptionModal({
               </div>
               <div>
                 <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-950 uppercase leading-tight">
-                  AIIMS APEX CLINICAL CENTER
+                  {patient.hospitalName || 'AIIMS APEX CLINICAL CENTER'}
                 </h1>
                 <p className="text-[10px] sm:text-xs font-semibold text-slate-600 uppercase tracking-wider mt-0.5">
-                  Outpatient Department (OPD) • General Medicine & Triage Unit
+                  Outpatient Department (OPD) • {patient.assignedDept || 'General Medicine & Triage Unit'}
                 </p>
                 <p className="text-[9px] sm:text-[11px] text-slate-500 mt-0.5">
-                  Ansari Nagar, New Delhi - 110029 • ABDM Facility ID: DL-ND-AIIMS-001
+                  {patient.assignedRoom ? `${patient.assignedRoom} • ` : ''}ABDM Recognized Facility Registry • {patient.hospitalCode || 'AIIMS-DEL'}
                 </p>
               </div>
             </div>

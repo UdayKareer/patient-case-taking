@@ -781,8 +781,8 @@ export const getFreshDemoProfile = (): PatientProfile => ({
   pastVisits: [
     {
       date: '10 Aug 2024',
-      hospital: 'City Hospital',
-      department: 'General Medicine',
+      hospital: 'Safdarjung Hospital & VMMC, New Delhi',
+      department: 'General Internal Medicine (Room 102)',
       reason: 'Routine checkup for BP, experiencing mild dizziness.',
       diagnosis: 'Hypertensive crisis secondary to non-compliance',
       prescriptions: ['Tab Telmisartan 40mg OD', 'Tab Amlodipine 5mg OD'],
@@ -791,8 +791,8 @@ export const getFreshDemoProfile = (): PatientProfile => ({
     },
     {
       date: '15 Mar 2024',
-      hospital: 'AIIMS Delhi',
-      department: 'Endocrinology',
+      hospital: 'AIIMS New Delhi (Apex)',
+      department: 'Endocrinology & Metabolism (Room 14)',
       reason: 'High blood sugar readings at home.',
       diagnosis: 'Uncontrolled Type 2 Diabetes',
       prescriptions: ['Tab Metformin 1000mg BD', 'Tab Glimepiride 1mg OD'],
@@ -1183,12 +1183,12 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
       const existingVisits = prof.pastVisits || [];
       const newVisit = {
         date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-        hospital: fullPatient.hospitalName || fullPatient.hospitalCode || 'AIIMS Hospital',
-        department: fullPatient.assignedDept || 'General Medicine OPD',
+        hospital: fullPatient.hospitalName || fullPatient.hospitalCode || 'AIIMS New Delhi (Apex)',
+        department: fullPatient.assignedDept ? `${fullPatient.assignedDept} (${fullPatient.assignedRoom || fullPatient.doctorNumber || 'OPD Room 14'})` : 'General Medicine OPD (Room 14)',
         reason: fullPatient.chiefComplaint || 'Consultation intake',
         diagnosis: fullPatient.structuredSummary?.chiefComplaintSummary || 'Active consultation in progress',
         prescriptions: [],
-        doctorNotesHidden: `Token ${token} - Waiting in corridor. Doctor: ${fullPatient.doctorNumber || 'Room 14'}`
+        doctorNotesHidden: `Token ${token} - Corridor queue. Desk: ${fullPatient.doctorNumber || 'OPD Room 14'}`
       };
       
       const visitExists = existingVisits.some(v => v.reason === fullPatient.chiefComplaint && v.date === newVisit.date);
