@@ -1119,12 +1119,12 @@ export default function PatientDashboard() {
                   type="text"
                   value={hospitalSearch}
                   onChange={(e) => setHospitalSearch(e.target.value)}
-                  placeholder="Search by hospital name, city (e.g. Delhi, Rishikesh, Jaipur), or code..."
+                  placeholder="Search 50+ government hospitals by name (e.g. AIIMS, Safdarjung, KEM), city, or state..."
                   className="w-full pl-10 pr-4 py-2 bg-white rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                {['All', 'Central Apex Institute', 'Central Govt Hospital', 'National Apex AYUSH Institute'].map((cat) => (
+                {['All', 'Central Apex Institute', 'Central Govt Hospital', 'State Medical College', 'National Apex AYUSH Institute'].map((cat) => (
                   <button
                     key={cat}
                     type="button"
