@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { usePatientStore } from '../store/usePatientStore';
 import { aiRecognizeDepartment } from '../data/governmentHospitals';
+import { getTranslations } from '../data/regionalTranslations';
 
 export default function Summary() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export default function Summary() {
     return <Navigate to="/patient/login" replace />;
   }
 
+  const t = getTranslations(currentPatient.language);
   const isHindi = currentPatient.language === 'hi';
   
   // Determine OPD Department and Room based on AI Triage rules in real-time
@@ -94,12 +96,10 @@ export default function Summary() {
         </div>
 
         <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-          {isHindi ? 'पंजीकरण सफलतापूर्वक संपन्न' : 'OPD Registration Complete'}
+          {t.summary.completeTitle}
         </h1>
         <p className="text-xs text-slate-600 mt-2 max-w-md mx-auto leading-relaxed">
-          {isHindi
-            ? 'आपकी जानकारी ओपीडी परामर्श कक्ष को प्रेषित कर दी गई है। कृपया निर्धारित कक्ष में उपस्थित हों।'
-            : 'Your symptoms and clinical intake have been transferred to the attending physician. Please proceed to the station below.'}
+          {t.summary.completeSub}
         </p>
 
         {/* Reassuring Care Route Card (Calm Patient Guidance) */}
@@ -116,27 +116,27 @@ export default function Summary() {
             <div className="flex items-center justify-between gap-2 mb-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/90 border border-current">
                 {currentPatient.esiTriage.level <= 2
-                  ? isHindi ? 'शीघ्र सहायता' : 'Fast-Track Check-In'
+                  ? t.summary.fastTrack
                   : currentPatient.esiTriage.level === 3
-                  ? isHindi ? 'परामर्श क्रम' : 'Care Review'
-                  : isHindi ? 'सामान्य परामर्श' : 'Standard Care'}
+                  ? t.summary.careReview
+                  : t.summary.standardCare}
               </span>
               <span className="text-[11px] font-bold">
                 {currentPatient.esiTriage.level <= 2
-                  ? isHindi ? 'प्राथमिकता सहायता निर्धारित' : 'Priority Care Route'
+                  ? (isHindi ? 'प्राथमिकता सहायता निर्धारित' : 'Priority Care Route')
                   : currentPatient.esiTriage.level === 3
-                  ? isHindi ? 'परामर्श विवरण प्रेषित' : 'Details Sent to Doctor'
-                  : isHindi ? 'पंजीकरण सफल' : 'Confirmed'}
+                  ? (isHindi ? 'परामर्श विवरण प्रेषित' : 'Details Sent to Doctor')
+                  : (isHindi ? 'पंजीकरण सफल' : 'Confirmed')}
               </span>
             </div>
             <p className="text-xs font-medium leading-relaxed">
               {currentPatient.esiTriage.level <= 2
-                ? isHindi
+                ? (isHindi
                   ? 'आपकी जानकारी ओपीडी टीम को प्राथमिकता के साथ भेज दी गई है। कृपया अपने टोकन के साथ सीधे नर्सिंग काउंटर पर संपर्क करें ताकि आपकी जांच शीघ्र शुरू हो सके।'
-                  : 'Your clinical details have been shared with our attending team. Please present your token at the nursing desk for fast-track assistance.'
-                : isHindi
+                  : 'Your clinical details have been shared with our attending team. Please present your token at the nursing desk for fast-track assistance.')
+                : (isHindi
                 ? 'आपके लक्षण ओपीडी चिकित्सक को भेज दिए गए हैं। कृपया अपने टोकन नंबर के बुलाए जाने तक निर्धारित प्रतीक्षा क्षेत्र में बैठें।'
-                : 'Your intake details have been transmitted to the OPD desk. Please take a seat in the waiting area until your token is called.'}
+                : 'Your intake details have been transmitted to the OPD desk. Please take a seat in the waiting area until your token is called.')}
             </p>
           </div>
         )}
@@ -152,7 +152,7 @@ export default function Summary() {
             <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center mb-2.5">
               <MapPin size={18} />
             </div>
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Assigned OPD Station</span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">{t.summary.assignedStation}</span>
             <div className="text-xl font-bold text-slate-900">{routingInfo.dept}</div>
             <div className="text-sm font-semibold text-blue-600 mt-0.5">{routingInfo.room}</div>
             
@@ -173,7 +173,7 @@ export default function Summary() {
             onClick={handleReturnToDashboard}
             className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-all shadow-xs flex items-center justify-center gap-2 mx-auto"
           >
-            <span>{isHindi ? 'रोगी डैशबोर्ड खोलें' : 'Open Patient Dashboard'}</span>
+            <span>{t.summary.openDashboard}</span>
             <ArrowRight size={15} />
           </button>
         </div>

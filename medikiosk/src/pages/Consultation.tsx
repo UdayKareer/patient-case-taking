@@ -35,6 +35,7 @@ import {
   type DynamicQuestionOption
 } from '../services/clinicalAiService';
 import { aiRecognizeDepartment } from '../data/governmentHospitals';
+import { getTranslations, getLanguageInfo } from '../data/regionalTranslations';
 
 export default function Consultation() {
   const navigate = useNavigate();
@@ -45,6 +46,8 @@ export default function Consultation() {
     return <Navigate to="/patient/login" replace />;
   }
 
+  const t = getTranslations(currentPatient.language);
+  const langInfo = getLanguageInfo(currentPatient.language);
   const isHindi = currentPatient.language === 'hi';
   const isAyush = currentPatient.mode === 'ayush';
 
@@ -173,78 +176,35 @@ export default function Consultation() {
     currentPatient.chronicConditions
   ]);
 
-  // Read aloud prompt when step changes
+  // Read aloud prompt when step changes in chosen regional language
   useEffect(() => {
     if (!soundEnabled) return;
 
     let textToSpeak = '';
     if (currentStep === 0) {
-      textToSpeak = isHindi
-        ? 'कृपया अपनी मुख्य परेशानी बताएं या बोलें।'
-        : 'Please describe your main health concern today, or select one below.';
+      textToSpeak = t.chiefComplaint.tts;
     } else if (!isAyush) {
+      const domainKey =
+        clinicalDomain === 'fever' || clinicalDomain === 'respiratory' || clinicalDomain === 'gastrointestinal'
+          ? clinicalDomain
+          : 'general';
+
       if (currentStep === 1) {
-        textToSpeak = isHindi
-          ? clinicalDomain === 'fever'
-            ? 'बुखार कब से शुरू हुआ है?'
-            : clinicalDomain === 'respiratory'
-            ? 'खांसी या सांस की तकलीफ कब से शुरू हुई?'
-            : clinicalDomain === 'gastrointestinal'
-            ? 'पेट या पाचन की परेशानी कब से शुरू हुई?'
-            : 'यह तकलीफ कब से शुरू हुई?'
-          : clinicalDomain === 'fever'
-          ? 'When did the fever first start?'
-          : clinicalDomain === 'respiratory'
-          ? 'When did the cough or breathing trouble start?'
-          : clinicalDomain === 'gastrointestinal'
-          ? 'When did the digestive or stomach discomfort start?'
-          : 'When did these symptoms first start?';
+        textToSpeak = t.stepDuration[domainKey].tts;
       } else if (currentStep === 2) {
-        textToSpeak = isHindi
-          ? clinicalDomain === 'fever'
-            ? 'बुखार कैसा महसूस हो रहा है? क्या कंपकंपी है?'
-            : clinicalDomain === 'respiratory'
-            ? 'खांसी और बलगम का स्वरूप कैसा है?'
-            : clinicalDomain === 'gastrointestinal'
-            ? 'पेट या शौच का स्वरूप कैसा है?'
-            : 'तकलीफ का अहसास कैसा है?'
-          : clinicalDomain === 'fever'
-          ? 'How does the fever feel?'
-          : clinicalDomain === 'respiratory'
-          ? 'What is the character of your cough or sputum?'
-          : clinicalDomain === 'gastrointestinal'
-          ? 'What does the digestive discomfort feel like?'
-          : 'What does the discomfort feel like?';
+        textToSpeak = t.stepCharacter[domainKey].tts;
       } else if (currentStep === 3) {
-        textToSpeak = isHindi
-          ? clinicalDomain === 'fever'
-            ? 'बुखार का असर शरीर के किन हिस्सों में ज्यादा है?'
-            : clinicalDomain === 'respiratory'
-            ? 'सांस या जकड़न का असर सीने में कहां महसूस हो रहा है?'
-            : clinicalDomain === 'gastrointestinal'
-            ? 'पेट में तकलीफ किस जगह है, क्या यह कहीं और फैलती है?'
-            : 'क्या यह दर्द शरीर में कहीं और भी फैलता है?'
-          : clinicalDomain === 'fever'
-          ? 'Which parts of your body are most affected by the fever?'
-          : clinicalDomain === 'respiratory'
-          ? 'Which areas of your chest and throat are affected?'
-          : clinicalDomain === 'gastrointestinal'
-          ? 'Where in your abdomen is the discomfort located?'
-          : 'Does the pain spread anywhere else?';
+        textToSpeak = t.stepSiteRadiation[domainKey].tts;
       } else if (currentStep === 4) {
-        textToSpeak = isHindi
-          ? 'तकलीफ की तीव्रता एक से दस के पैमाने पर कितनी है?'
-          : 'On a scale from 1 to 10, how severe is your discomfort?';
+        textToSpeak = t.stepSeverity.tts;
       } else if (currentStep === 5) {
-        textToSpeak = isHindi ? 'क्या साथ में कोई अन्य लक्षण भी हैं?' : 'Are you experiencing any other associated symptoms?';
+        textToSpeak = t.stepAssociated.tts;
       } else if (currentStep === 6) {
-        textToSpeak = isHindi ? 'तकलीफ किस चीज से बढ़ती है?' : 'What makes your symptoms worse?';
+        textToSpeak = t.stepAggravating.tts;
       } else if (currentStep === 7) {
-        textToSpeak = isHindi ? 'किस चीज से आराम मिलता है?' : 'What provides relief?';
+        textToSpeak = t.stepRelieving.tts;
       } else if (currentStep === 8) {
-        textToSpeak = isHindi
-          ? 'डॉक्टर के परामर्श के लिए कृपया इन कुछ संक्षिप्त सवालों के जवाब दें।'
-          : 'Please answer these quick follow-up questions to help your doctor.';
+        textToSpeak = t.stepFollowUp.tts;
       }
     } else if (isAyush) {
       if (currentStep === 1 && !ayushCompleted) {
@@ -260,7 +220,7 @@ export default function Consultation() {
     if (textToSpeak) {
       speakPrompt(textToSpeak, currentPatient.language);
     }
-  }, [currentStep, soundEnabled, isHindi, isAyush, clinicalDomain, currentPatient.language, activeAyushQuestionId, ayushCompleted]);
+  }, [currentStep, soundEnabled, isHindi, isAyush, clinicalDomain, currentPatient.language, activeAyushQuestionId, ayushCompleted, t]);
 
   // Cleanup active voice recording on component unmount
   useEffect(() => {
@@ -310,9 +270,7 @@ export default function Consultation() {
       },
       {
         language: currentPatient.language,
-        prompt: isHindi
-          ? 'रोगी के स्वास्थ्य लक्षण: छाती में दर्द, बुखार, उल्टी, चक्कर, घबराहट, सांस फूलना, एसिडिटी, कमजोरी, खांसी, दस्त, सिरदर्द।'
-          : 'Patient medical symptoms: chest pain, fever, chills, vomiting, nausea, acidity, shortness of breath, palpitations, weakness, cough, diarrhea, headache.'
+        prompt: `Patient describing medical symptoms in ${langInfo.name} (${langInfo.nativeName}): chest pain, fever, chills, cough, breathlessness, abdominal distress, weakness, headache, vomiting, body pain, dizziness.`
       }
     );
 
@@ -512,16 +470,27 @@ export default function Consultation() {
           <button
             type="button"
             onClick={() => {
-              speakPrompt(
-                isHindi ? 'प्रश्न को ध्यान से सुनें' : 'Please listen carefully to the question',
-                currentPatient.language
-              );
+              const domainKey =
+                clinicalDomain === 'fever' || clinicalDomain === 'respiratory' || clinicalDomain === 'gastrointestinal'
+                  ? clinicalDomain
+                  : 'general';
+              let textToRead = t.chiefComplaint.tts;
+              if (currentStep === 1) textToRead = t.stepDuration[domainKey].tts;
+              else if (currentStep === 2) textToRead = t.stepCharacter[domainKey].tts;
+              else if (currentStep === 3) textToRead = t.stepSiteRadiation[domainKey].tts;
+              else if (currentStep === 4) textToRead = t.stepSeverity.tts;
+              else if (currentStep === 5) textToRead = t.stepAssociated.tts;
+              else if (currentStep === 6) textToRead = t.stepAggravating.tts;
+              else if (currentStep === 7) textToRead = t.stepRelieving.tts;
+              else if (currentStep === 8) textToRead = t.stepFollowUp.tts;
+
+              speakPrompt(textToRead, currentPatient.language);
             }}
-            className="flex items-center gap-1 text-slate-500 hover:text-blue-600 transition-colors"
-            title="Read Question Aloud"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 transition-colors cursor-pointer text-xs font-medium"
+            title="Read Question Aloud in Your Language"
           >
             <Volume2 size={15} />
-            <span className="text-[11px] hidden sm:inline">{isHindi ? 'सुनें' : 'Listen'}</span>
+            <span className="text-[11px] font-semibold">{t.listen}</span>
           </button>
         </div>
 
@@ -545,12 +514,10 @@ export default function Consultation() {
                 {isHindi ? 'चरण 1: मुख्य स्वास्थ्य समस्या' : 'Section 1: Chief Complaint'}
               </span>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                {isHindi ? 'आज आपकी मुख्य समस्या क्या है?' : 'What is your main health concern today?'}
+                {t.chiefComplaint.title}
               </h1>
               <p className="text-xs text-slate-500 mt-1">
-                {isHindi
-                  ? 'माइक दबाकर बोलें, टाइप करें या नीचे से उपयुक्त लक्षण चुनें।'
-                  : 'Speak using the microphone, type below, or select from common complaints.'}
+                {t.chiefComplaint.sub}
               </p>
             </div>
 
@@ -560,11 +527,7 @@ export default function Consultation() {
                 rows={3}
                 value={chiefComplaintText}
                 onChange={(e) => setChiefComplaintText(e.target.value)}
-                placeholder={
-                  isHindi
-                    ? 'उदा. 2 दिनों से तेज बुखार है, कंपकंपी आ रही है और पूरे बदन में दर्द है...'
-                    : 'e.g. High fever with shivering chills, severe bodyache and weakness for 2 days...'
-                }
+                placeholder={t.chiefComplaint.placeholder}
                 className="w-full p-4 pr-14 bg-white rounded-xl border border-slate-200 focus:border-blue-600 focus:ring-3 focus:ring-blue-600/10 text-sm text-slate-900 placeholder:text-slate-400 outline-none resize-none transition-all shadow-xs"
               />
               <button
@@ -602,9 +565,7 @@ export default function Consultation() {
                   <div className="text-xs font-semibold text-red-600 flex items-center gap-1.5 animate-pulse">
                     <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
                     <span>
-                      {isHindi
-                        ? 'माइक चालू है... अपने लक्षण बोलें (बोलना खत्म होने पर दोबारा दबाएं)'
-                        : 'Listening... speak symptoms in Hindi, English or Hinglish (tap mic when done)'}
+                      {t.speak} ({langInfo.nativeName})... {isHindi ? 'बोलना खत्म होने पर दोबारा दबाएं' : 'tap mic when done'}
                     </span>
                   </div>
                 )}
@@ -625,15 +586,15 @@ export default function Consultation() {
             {/* Categorized Complaint Selectors */}
             <div>
               <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-2">
-                {isHindi ? 'सामान्य लक्षण श्रेणियां:' : 'Common Symptom Categories:'}
+                {t.chiefComplaint.orChoosePreset}
               </span>
 
               <div className="grid grid-cols-2 gap-2.5">
                 {[
-                  { id: 'fever_infections', labelEn: '🌡️ Fever & Chills', labelHi: '🌡️ बुखार और संक्रमण' },
-                  { id: 'cardiorespiratory', labelEn: '🫀 Chest & Breathing', labelHi: '🫀 सीना और सांस' },
-                  { id: 'gastro_ayush', labelEn: '🩺 Stomach & Digestion', labelHi: '🩺 पेट और पाचन' },
-                  { id: 'neuro_joint', labelEn: '🦴 Joints & Headache', labelHi: '🦴 जोड़, कमर व सिरदर्द' },
+                  { id: 'fever_infections', label: `🌡️ ${t.presets.feverTitle}` },
+                  { id: 'cardiorespiratory', label: `🫀 ${t.presets.chestTitle}` },
+                  { id: 'gastro_ayush', label: `🩺 ${t.presets.giTitle}` },
+                  { id: 'neuro_joint', label: `🦴 ${t.presets.orthoTitle}` },
                 ].map((cat) => (
                   <button
                     key={cat.id}
@@ -645,7 +606,7 @@ export default function Consultation() {
                         : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50/80'
                     }`}
                   >
-                    <span>{isHindi ? cat.labelHi : cat.labelEn}</span>
+                    <span>{cat.label}</span>
                     <span className="text-slate-400 text-[10px]">{selectedCategory === cat.id ? '▲' : '▼'}</span>
                   </button>
                 ))}
@@ -741,21 +702,7 @@ export default function Consultation() {
                 {isHindi ? 'कदम 2: अवधि' : 'Step 2: Onset & Duration'}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-                {isHindi
-                  ? clinicalDomain === 'fever'
-                    ? 'बुखार या तकलीफ कब से शुरू हुई?'
-                    : clinicalDomain === 'respiratory'
-                    ? 'खांसी या सांस की तकलीफ कब से शुरू हुई?'
-                    : clinicalDomain === 'gastrointestinal'
-                    ? 'पेट या पाचन की परेशानी कब से शुरू हुई?'
-                    : 'यह तकलीफ कब से शुरू हुई?'
-                  : clinicalDomain === 'fever'
-                  ? 'When did the fever or illness start?'
-                  : clinicalDomain === 'respiratory'
-                  ? 'When did the cough or breathing difficulty start?'
-                  : clinicalDomain === 'gastrointestinal'
-                  ? 'When did the digestive or stomach discomfort start?'
-                  : 'When did these symptoms first start?'}
+                {t.stepDuration[clinicalDomain === 'fever' || clinicalDomain === 'respiratory' || clinicalDomain === 'gastrointestinal' ? clinicalDomain : 'general'].title}
               </h2>
             </div>
 
@@ -794,7 +741,7 @@ export default function Consultation() {
                 }`}
               >
                 <Mic size={15} />
-                <span className="hidden sm:inline">{isListening && activeVoiceField === 'duration' ? 'Listening' : 'Speak'}</span>
+                <span className="hidden sm:inline">{isListening && activeVoiceField === 'duration' ? t.stopVoice : t.speak}</span>
               </button>
             </div>
           </div>
@@ -808,21 +755,7 @@ export default function Consultation() {
                 {isHindi ? 'कदम 3: अहसास का प्रकार' : 'Step 3: Character & Sensation'}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-                {isHindi
-                  ? clinicalDomain === 'fever'
-                    ? 'बुखार और तकलीफ का अहसास कैसा है?'
-                    : clinicalDomain === 'respiratory'
-                    ? 'खांसी और बलगम का स्वरूप कैसा है?'
-                    : clinicalDomain === 'gastrointestinal'
-                    ? 'पेट या पाचन की परेशानी कैसी महसूस हो रही है?'
-                    : 'तकलीफ का अहसास कैसा है?'
-                  : clinicalDomain === 'fever'
-                  ? 'How does the fever feel?'
-                  : clinicalDomain === 'respiratory'
-                  ? 'What is the character of your cough or breathing?'
-                  : clinicalDomain === 'gastrointestinal'
-                  ? 'What does the digestive discomfort feel like?'
-                  : 'What does the sensation feel like?'}
+                {t.stepCharacter[clinicalDomain === 'fever' || clinicalDomain === 'respiratory' || clinicalDomain === 'gastrointestinal' ? clinicalDomain : 'general'].title}
               </h2>
             </div>
 
@@ -861,7 +794,7 @@ export default function Consultation() {
                 }`}
               >
                 <Mic size={15} />
-                <span className="hidden sm:inline">{isListening && activeVoiceField === 'character' ? 'Listening' : 'Speak'}</span>
+                <span className="hidden sm:inline">{isListening && activeVoiceField === 'character' ? t.stopVoice : t.speak}</span>
               </button>
             </div>
           </div>
@@ -875,21 +808,7 @@ export default function Consultation() {
                 {isHindi ? 'कदम 4: फैलाव / प्रभावित अंग' : 'Step 4: Affected Regions & Spread'}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-                {isHindi
-                  ? clinicalDomain === 'fever'
-                    ? 'असर शरीर के किन हिस्सों में ज्यादा महसूस हो रहा है?'
-                    : clinicalDomain === 'respiratory'
-                    ? 'सांस या जकड़न का असर सीने में कहां महसूस हो रहा है?'
-                    : clinicalDomain === 'gastrointestinal'
-                    ? 'पेट में तकलीफ किस जगह है, क्या यह कहीं और फैलती है?'
-                    : 'क्या दर्द शरीर में कहीं और फैलता है?'
-                  : clinicalDomain === 'fever'
-                  ? 'Which regions are most affected by the fever?'
-                  : clinicalDomain === 'respiratory'
-                  ? 'Which areas of your chest and throat are affected?'
-                  : clinicalDomain === 'gastrointestinal'
-                  ? 'Where in your abdomen is the discomfort located?'
-                  : 'Does the discomfort spread anywhere else?'}
+                {t.stepSiteRadiation[clinicalDomain === 'fever' || clinicalDomain === 'respiratory' || clinicalDomain === 'gastrointestinal' ? clinicalDomain : 'general'].title}
               </h2>
             </div>
 
@@ -942,8 +861,11 @@ export default function Consultation() {
                 {isHindi ? 'कदम 5: तीव्रता' : 'Step 5: Severity Scale'}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-                {isHindi ? 'तकलीफ की तीव्रता कितनी है?' : 'How severe is your discomfort?'}
+                {t.stepSeverity.title}
               </h2>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                {t.stepSeverity.sub}
+              </p>
             </div>
 
             <div className="max-w-md mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-200/90 shadow-xs space-y-6">
@@ -959,10 +881,10 @@ export default function Consultation() {
                   }`}
                 >
                   {severity >= 8
-                    ? isHindi ? 'अत्यधिक तीव्र (Severe / High)' : 'Severe Discomfort'
+                    ? t.stepSeverity.severe
                     : severity >= 5
-                    ? isHindi ? 'मध्यम (Moderate)' : 'Moderate'
-                    : isHindi ? 'हल्का (Mild)' : 'Mild'}
+                    ? t.stepSeverity.moderate
+                    : t.stepSeverity.mild}
                 </span>
               </div>
 
@@ -992,10 +914,10 @@ export default function Consultation() {
                 {isHindi ? 'कदम 6: अन्य लक्षण' : 'Step 6: Associated Symptoms'}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-                {isHindi ? 'क्या साथ में कोई अन्य लक्षण भी हैं?' : 'Are you experiencing other symptoms?'}
+                {t.stepAssociated.title}
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                {isHindi ? 'लागू होने वाले लक्षण चुनें, या नीचे खुद बोलें।' : 'Select all that apply, or speak your symptoms below.'}
+                {t.stepAssociated.sub}
               </p>
             </div>
 
@@ -1059,8 +981,11 @@ export default function Consultation() {
                 {isHindi ? 'कदम 7: बढ़ने के कारण' : 'Step 7: Aggravating Factors'}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-                {isHindi ? 'तकलीफ किस चीज से बढ़ती है?' : 'What makes your symptoms worse?'}
+                {t.stepAggravating.title}
               </h2>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                {t.stepAggravating.sub}
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
@@ -1098,7 +1023,7 @@ export default function Consultation() {
                 }`}
               >
                 <Mic size={15} />
-                <span className="hidden sm:inline">{isListening && activeVoiceField === 'aggravating' ? 'Listening' : 'Speak'}</span>
+                <span className="hidden sm:inline">{isListening && activeVoiceField === 'aggravating' ? t.stopVoice : t.speak}</span>
               </button>
             </div>
           </div>
@@ -1112,8 +1037,11 @@ export default function Consultation() {
                 {isHindi ? 'कदम 8: राहत के उपाय' : 'Step 8: Relieving Factors'}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-                {isHindi ? 'किस चीज से आराम मिलता है?' : 'What provides relief?'}
+                {t.stepRelieving.title}
               </h2>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                {t.stepRelieving.sub}
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
@@ -1151,7 +1079,7 @@ export default function Consultation() {
                 }`}
               >
                 <Mic size={15} />
-                <span className="hidden sm:inline">{isListening && activeVoiceField === 'relieving' ? 'Listening' : 'Speak'}</span>
+                <span className="hidden sm:inline">{isListening && activeVoiceField === 'relieving' ? t.stopVoice : t.speak}</span>
               </button>
             </div>
           </div>
@@ -1166,12 +1094,10 @@ export default function Consultation() {
                 {isHindi ? 'कदम 9: अतिरिक्त स्वास्थ्य विवरण' : 'Step 9: Additional Health Details'}
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                {isHindi ? 'परामर्श हेतु संक्षिप्त प्रश्न' : 'Targeted Health Questions'}
+                {t.stepFollowUp.title}
               </h2>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                {isHindi
-                  ? 'डॉक्टर को आपकी स्थिति को और बेहतर समझने में मदद करने के लिए कुछ संक्षिप्त प्रश्न।'
-                  : 'A few short questions to help your doctor understand your condition better before your turn.'}
+                {t.stepFollowUp.sub}
               </p>
             </div>
 
@@ -1528,7 +1454,7 @@ export default function Consultation() {
           className="px-4 py-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs flex items-center gap-1.5 transition-all shadow-2xs"
         >
           <ArrowLeft size={14} />
-          <span>{isHindi ? 'पीछे' : 'Back'}</span>
+          <span>{t.back}</span>
         </button>
 
         <button
@@ -1550,12 +1476,8 @@ export default function Consultation() {
             <>
               <span>
                 {currentStep === totalSteps - 1
-                  ? isHindi
-                    ? 'ओपीडी कक्ष व टोकन प्राप्त करें'
-                    : 'Confirm OPD & Get Token'
-                  : isHindi
-                  ? 'आगे बढ़ें'
-                  : 'Continue'}
+                  ? t.submit
+                  : t.next}
               </span>
               <ArrowRight size={15} />
             </>

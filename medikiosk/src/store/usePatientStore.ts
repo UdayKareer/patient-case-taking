@@ -4,6 +4,9 @@ import { supabase } from '../lib/supabase';
 import { type EsiTriageResult } from '../services/clinicalAiService';
 import { type DashavidhaData, type AshtaSthanaData } from '../data/clinicalProtocols';
 import { offlineSyncService } from '../services/offlineSyncService';
+import { type SupportedLanguage } from '../data/regionalTranslations';
+
+export type { SupportedLanguage };
 
 const socket = io('https://medikiosk-sih-2026.loca.lt', {
   extraHeaders: {
@@ -103,7 +106,7 @@ export interface PatientData {
   phone: string;
   height: string;
   weight: string;
-  language: 'en' | 'hi';
+  language: SupportedLanguage;
   mode: 'modern' | 'ayush';
   
   // Step 1: Chief Complaint & Symptom Exploration (SOCRATES)
@@ -208,7 +211,7 @@ interface PatientStore {
   checkProfileExists: (id: string) => boolean;
   loginProfile: (id: string, regData?: { name: string; age: string; gender: string }) => void;
   logoutProfile: () => void;
-  setLanguage: (lang: 'en' | 'hi') => void;
+  setLanguage: (lang: SupportedLanguage) => void;
   setMode: (mode: 'modern' | 'ayush') => void;
   addDocument: (doc: UploadedDocument) => void;
   addDocumentToPatient: (patientToken: string, doc: UploadedDocument) => void;

@@ -5,12 +5,13 @@
  */
 
 import { createSpeechRecognizer } from '../utils/speechVoice';
+import { type SupportedLanguage, getLanguageInfo } from '../data/regionalTranslations';
 
 const DEFAULT_CLINICAL_PROMPT =
-  'Patient describing medical symptoms in Hindi, English, or Hinglish: ' +
-  'chest pain, seene me dard, bukhar, fever, vomiting, ulti, acidity, pait me dard, ' +
-  'breathing difficulty, saas phoolna, blood pressure, chakkar, ghabrahat, sugar, weakness, ' +
-  'kamzori, joint pain, jodo me dard, cough, khansi, loose motions, sir dard, headache.';
+  'Patient describing medical symptoms in Indian regional languages (Hindi, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, Malayalam, Punjabi, Odia, English): ' +
+  'chest pain, seene me dard, bukhar, fever, vomiting, ulti, acidity, pait me dard, buker betha, jwor, chest tightness, ' +
+  'gunde noppi, jwaram, chhati dukhavo, nenju vali, kaichal, breathing difficulty, saas phoolna, blood pressure, chakkar, ' +
+  'ghabrahat, sugar, weakness, kamzori, joint pain, jodo me dard, cough, khansi, kaph, loose motions, sir dard, headache.';
 
 export const getGroqApiKey = (): string => {
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GROQ_API_KEY) {
@@ -108,7 +109,7 @@ export class AudioRecorder {
 }
 
 export interface TranscribeOptions {
-  language?: 'en' | 'hi' | string;
+  language?: SupportedLanguage | string;
   prompt?: string;
 }
 
@@ -136,7 +137,8 @@ export async function transcribeWithGroq(
   formData.append('prompt', prompt);
 
   if (options?.language) {
-    formData.append('language', options.language === 'hi' ? 'hi' : 'en');
+    const whisperCode = getLanguageInfo(options.language as SupportedLanguage)?.whisperCode || options.language;
+    formData.append('language', whisperCode);
   }
 
   const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
@@ -167,7 +169,7 @@ export interface VoiceSessionHandlers {
 }
 
 export interface VoiceSessionConfig {
-  language: 'en' | 'hi';
+  language: SupportedLanguage;
   prompt?: string;
 }
 

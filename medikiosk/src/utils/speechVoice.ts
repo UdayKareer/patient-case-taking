@@ -1,4 +1,10 @@
-export const speakPrompt = (text: string, language: 'en' | 'hi', onEnd?: () => void) => {
+import { type SupportedLanguage, getLanguageInfo } from '../data/regionalTranslations';
+
+export const speakPrompt = (
+  text: string,
+  language: SupportedLanguage = 'en',
+  onEnd?: () => void
+) => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     if (onEnd) onEnd();
     return;
@@ -12,27 +18,43 @@ export const speakPrompt = (text: string, language: 'en' | 'hi', onEnd?: () => v
     return;
   }
 
+  const langInfo = getLanguageInfo(language);
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
-  utterance.rate = 0.95; // Slightly slower for clarity in noisy hospitals
+  utterance.lang = langInfo.bcp47;
+  utterance.rate = 0.92; // Slightly measured for clinical clarity in regional languages
   utterance.pitch = 1.0;
 
-  // Try to find natural sounding Premium/AI voices
+  // Find natural sounding native voices installed on Android/iOS/Windows/Chrome
   const voices = window.speechSynthesis.getVoices();
   if (voices.length > 0) {
-    if (language === 'hi') {
-      const premiumHi = voices.find(v => 
-        (v.lang.includes('hi') && (v.name.includes('Online') || v.name.includes('Google') || v.name.includes('Premium')))
+    const langCode = langInfo.code;
+    const langNameLower = langInfo.name.toLowerCase();
+
+    // 1. Check for high-quality / online / natural regional voice
+    const premiumRegional = voices.find((v) => {
+      const matchLang = v.lang.toLowerCase().startsWith(langCode) || v.lang.toLowerCase() === langInfo.bcp47.toLowerCase();
+      const matchName = v.name.toLowerCase().includes(langNameLower);
+      const isHighQuality =
+        v.name.includes('Online') ||
+        v.name.includes('Google') ||
+        v.name.includes('Natural') ||
+        v.name.includes('Premium');
+      return (matchLang || matchName) && isHighQuality;
+    });
+
+    // 2. Fallback to any voice matching regional language
+    const standardRegional = voices.find((v) => {
+      return (
+        v.lang.toLowerCase().startsWith(langCode) ||
+        v.lang.toLowerCase() === langInfo.bcp47.toLowerCase() ||
+        v.name.toLowerCase().includes(langNameLower)
       );
-      const standardHi = voices.find(v => v.lang.includes('hi') || v.name.includes('Hindi'));
-      utterance.voice = premiumHi || standardHi || null;
-    } else {
-      const premiumEn = voices.find(v => 
-        ((v.lang === 'en-IN' || v.lang === 'en-US' || v.lang === 'en-GB') && 
-        (v.name.includes('Online') || v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Premium')))
-      );
-      const standardEn = voices.find(v => v.lang === 'en-IN' || v.name.includes('India'));
-      utterance.voice = premiumEn || standardEn || null;
+    });
+
+    if (premiumRegional) {
+      utterance.voice = premiumRegional;
+    } else if (standardRegional) {
+      utterance.voice = standardRegional;
     }
   }
 
@@ -59,7 +81,10 @@ export interface SpeechRecognizerHandlers {
   onEnd?: () => void;
 }
 
-export const createSpeechRecognizer = (language: 'en' | 'hi', handlers: SpeechRecognizerHandlers) => {
+export const createSpeechRecognizer = (
+  language: SupportedLanguage = 'en',
+  handlers: SpeechRecognizerHandlers
+) => {
   if (typeof window === 'undefined') return null;
 
   const SpeechRecognition =
@@ -71,10 +96,11 @@ export const createSpeechRecognizer = (language: 'en' | 'hi', handlers: SpeechRe
   }
 
   try {
+    const langInfo = getLanguageInfo(language);
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
+    recognition.lang = langInfo.bcp47;
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
@@ -95,3 +121,4 @@ export const createSpeechRecognizer = (language: 'en' | 'hi', handlers: SpeechRe
     return null;
   }
 };
+
