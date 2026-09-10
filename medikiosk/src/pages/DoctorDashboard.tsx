@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   Search,
@@ -123,22 +123,36 @@ export default function DoctorDashboard() {
 
   useEffect(() => {
     initSocket();
-    // Use queueTrigger to silence TS, it naturally triggers a re-render from Zustand
-  }, [initSocket, queueTrigger]);
+  }, [initSocket]);
 
   // Synchronize selectedPatient whenever queueTrigger updates from intake or cross-tab events
   useEffect(() => {
     if (selectedPatient?.token && mockDatabase[selectedPatient.token]) {
-      setSelectedPatient(mockDatabase[selectedPatient.token]);
+      const fresh = mockDatabase[selectedPatient.token];
+      setSelectedPatient((prev) => {
+        if (!prev) return fresh;
+        if (
+          prev.token === fresh.token &&
+          prev.status === fresh.status &&
+          prev.doctorNotes === fresh.doctorNotes &&
+          prev.primaryDiagnosis === fresh.primaryDiagnosis &&
+          prev.namasteCode === fresh.namasteCode &&
+          prev.triageLevel === fresh.triageLevel &&
+          (prev.uploadedDocuments?.length || 0) === (fresh.uploadedDocuments?.length || 0)
+        ) {
+          return prev;
+        }
+        return fresh;
+      });
     }
   }, [queueTrigger, selectedPatient?.token]);
 
-  // Live real-time ticker: re-renders every 1 second so wait times tick live without page refresh
+  // Live real-time ticker: updates every 10 seconds to keep UI completely smooth without freezing the event loop
   const [, setLiveTick] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => {
       setLiveTick((prev) => prev + 1);
-    }, 1000);
+    }, 10000);
     return () => clearInterval(timer);
   }, []);
 
@@ -872,17 +886,25 @@ export default function DoctorDashboard() {
     }
   };
 
-  const allQueuePatients = Object.values(mockDatabase);
-  const activeQueuePatients = allQueuePatients.filter((p) => p.status !== 'accepted' && p.status !== 'admitted');
-  const relievedPatients = allQueuePatients.filter((p) => p.status === 'accepted');
+  const allQueuePatients = useMemo(() => Object.values(mockDatabase), [queueTrigger]);
+  const activeQueuePatients = useMemo(
+    () => allQueuePatients.filter((p) => p.status !== 'accepted' && p.status !== 'admitted'),
+    [allQueuePatients]
+  );
+  const relievedPatients = useMemo(
+    () => allQueuePatients.filter((p) => p.status === 'accepted'),
+    [allQueuePatients]
+  );
 
-  const filteredQueue = allQueuePatients.filter((p) => {
-    if (queueFilter === 'emergency') return p.triageLevel === 'emergency' && p.status !== 'accepted';
-    if (queueFilter === 'ayush') return p.mode === 'ayush' && p.status !== 'accepted';
-    if (queueFilter === 'waiting') return p.status === 'waiting';
-    if (queueFilter === 'relieved') return p.status === 'accepted';
-    return p.status !== 'accepted';
-  });
+  const filteredQueue = useMemo(() => {
+    return allQueuePatients.filter((p) => {
+      if (queueFilter === 'emergency') return p.triageLevel === 'emergency' && p.status !== 'accepted';
+      if (queueFilter === 'ayush') return p.mode === 'ayush' && p.status !== 'accepted';
+      if (queueFilter === 'waiting') return p.status === 'waiting';
+      if (queueFilter === 'relieved') return p.status === 'accepted';
+      return p.status !== 'accepted';
+    });
+  }, [allQueuePatients, queueFilter]);
 
   const sortPatients = (patients: PatientData[]) => {
     return [...patients].sort((a, b) => {
@@ -901,8 +923,8 @@ export default function DoctorDashboard() {
     });
   };
 
-  const sortedActivePatients = sortPatients(activeQueuePatients);
-  const sortedFilteredQueue = sortPatients(filteredQueue);
+  const sortedActivePatients = useMemo(() => sortPatients(activeQueuePatients), [activeQueuePatients, sortBy]);
+  const sortedFilteredQueue = useMemo(() => sortPatients(filteredQueue), [filteredQueue, sortBy]);
 
   const handleMarkDoseGiven = (patient: PatientData, medId: string) => {
     if (!patient.ipdMedications) return;

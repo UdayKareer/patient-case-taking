@@ -27,7 +27,7 @@ export default function DoctorLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex font-sans text-slate-100 overflow-hidden">
+    <div className="h-screen max-h-screen bg-slate-900 flex font-sans text-slate-100 overflow-hidden">
       
       {/* Desktop Persistent Sidebar */}
       <div className="hidden lg:flex shrink-0">
@@ -67,7 +67,7 @@ export default function DoctorLayout() {
       )}
 
       {/* Main Workspace Frame */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-slate-50 text-slate-900">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full overflow-hidden bg-slate-50 text-slate-900">
         
         {/* Top Clinical Utility Bar */}
         <header className="h-14 bg-white border-b border-slate-200/90 px-4 sm:px-6 flex items-center justify-between shrink-0 shadow-2xs z-10">
@@ -121,7 +121,7 @@ export default function DoctorLayout() {
         </header>
 
         {/* Scrollable Clinical Stage */}
-        <main className="flex-1 overflow-y-auto bg-slate-50/60 p-4 sm:p-6 lg:p-7">
+        <main className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain bg-slate-50/60 p-4 sm:p-6 lg:p-7" style={{ WebkitOverflowScrolling: 'touch' }}>
           <Outlet context={{ activeTab, setActiveTab }} />
         </main>
       </div>

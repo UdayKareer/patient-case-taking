@@ -819,6 +819,8 @@ function broadcastSync(event: { type: string; [key: string]: any }) {
   }
 }
 
+let isSocketInitialized = false;
+
 export const usePatientStore = create<PatientStore>((set, get) => ({
   currentPatient: createInitialPatient(),
   currentProfile: null,
@@ -1274,6 +1276,9 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
   },
 
   initSocket: () => {
+    if (isSocketInitialized) return;
+    isSocketInitialized = true;
+
     socket.off('new_patient_in_queue');
     socket.on('new_patient_in_queue', (data: PatientData) => {
       mockDatabase[data.token] = data;
