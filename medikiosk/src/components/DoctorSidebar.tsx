@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   Stethoscope,
@@ -7,7 +8,8 @@ import {
   Activity,
   ShieldCheck,
   Building2,
-  Clock
+  Clock,
+  Sliders
 } from 'lucide-react';
 import { usePatientStore, mockDatabase } from '../store/usePatientStore';
 
@@ -20,6 +22,7 @@ interface DoctorSidebarProps {
 }
 
 export default function DoctorSidebar({ activeTab, setActiveTab, onLogout }: DoctorSidebarProps) {
+  const navigate = useNavigate();
   const { currentPatient } = usePatientStore();
 
   const allPatients = Object.values(mockDatabase);
@@ -169,6 +172,25 @@ export default function DoctorSidebar({ activeTab, setActiveTab, onLogout }: Doc
 
       {/* ABDM & System Status Box */}
       <div className="p-4 border-t border-slate-800/80 bg-slate-900/30">
+        {/* Demo Hub Button */}
+        <button
+          onClick={() => navigate('/demo')}
+          className="mb-3 w-full p-2.5 rounded-xl bg-gradient-to-r from-teal-950/90 to-slate-900 border border-teal-500/30 hover:border-teal-400 text-slate-200 text-left transition-all flex items-center justify-between group shadow-2xs"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-1.5 rounded-lg bg-teal-500/20 text-teal-400 group-hover:bg-teal-500 group-hover:text-slate-950 transition-colors">
+              <Sliders size={15} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-teal-300 group-hover:text-teal-200 truncate">Demo Control Hub</div>
+              <div className="text-[10px] text-slate-400 truncate">Inject cases & test personas</div>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-300 border border-teal-500/30">
+            /demo
+          </span>
+        </button>
+
         <div className="p-3 bg-slate-900/90 rounded-lg border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-[11px]">
             <span className="text-slate-400 flex items-center gap-1.5">

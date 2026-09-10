@@ -5,6 +5,7 @@ import { type EsiTriageResult } from '../services/clinicalAiService';
 import { type DashavidhaData, type AshtaSthanaData } from '../data/clinicalProtocols';
 import { offlineSyncService } from '../services/offlineSyncService';
 import { type SupportedLanguage } from '../data/regionalTranslations';
+import { DEMO_PRESET_PATIENTS, getFourActiveDemoPatients } from '../data/demoPresets';
 
 export type { SupportedLanguage };
 
@@ -16,6 +17,7 @@ const socket = io('https://medikiosk-sih-2026.loca.lt', {
 
 export interface PatientProfile {
   abhaId: string;
+  abhaVerified?: boolean;
   name: string;
   age: string;
   gender: string;
@@ -227,6 +229,9 @@ interface PatientStore {
   clearQueue: () => Promise<void>;
   initSocket: () => void;
   updatePatientIntegrativeExam: (patientToken: string, dashavidha: Partial<DashavidhaData>, ashtaSthana: Partial<AshtaSthanaData>) => void;
+  populateDemoPatients: () => void;
+  clearActiveQueueToRelieved: () => void;
+  injectCustomPatient: (patient: PatientData) => void;
 }
 
 const createInitialPatient = (): PatientData => ({
@@ -741,6 +746,14 @@ export const mockDatabase: Record<string, PatientData> = {
       { id: 'n2', timestamp: '07 Sep, 09:30 AM (Day 2 Morning Rounds)', doctorName: 'Dr. R. Verma, MD', note: 'Dyspnea significantly improved. Wheezing diminished, SpO2 94% on 2L O2. Patient able to speak in full sentences. Chest air entry improved bilaterally. Continued current IV regimen.', vitalsSummary: 'SpO2: 94% | BP: 132/84 | HR: 90' },
       { id: 'n3', timestamp: '08 Sep, 08:45 AM (Day 3 Today\'s Rounds)', doctorName: 'Dr. R. Verma, MD', note: 'Patient afebrile for past 24 hours. Cough productive with thinning sputum. SpO2 96% maintaining well on room air. Plan: Wean off supplemental O2. Step down IV Hydrocortisone to oral Prednisolone 30mg tomorrow. Discharge planned for Day 4 if stable.', vitalsSummary: 'SpO2: 96% | BP: 126/80 | HR: 82' }
     ]
+  },
+  'NEU-214': {
+    ...DEMO_PRESET_PATIENTS[3].patient,
+    status: 'waiting'
+  },
+  'CRD-502': {
+    ...DEMO_PRESET_PATIENTS[4].patient,
+    status: 'waiting'
   }
 };
 
@@ -759,7 +772,7 @@ export const getFreshDemoProfile = (): PatientProfile => ({
   ],
   allergies: [
     { allergen: 'Penicillin', reaction: 'Anaphylaxis / Urticaria', severity: 'severe', isDoctorVerified: true },
-    { allergen: 'Dust', reaction: 'Sneezing', severity: 'mild', isDoctorVerified: false }
+    { allergen: 'Sulfa Drugs', reaction: 'Mild skin rash', severity: 'moderate', isDoctorVerified: false }
   ],
   uploadedDocuments: [
     {
@@ -778,15 +791,15 @@ export const getFreshDemoProfile = (): PatientProfile => ({
         { test: 'Total Cholesterol', value: '248', unit: 'mg/dL', range: '< 200', isOutOfRange: true },
         { test: 'Serum Creatinine', value: '1.4', unit: 'mg/dL', range: '0.7 - 1.2', isOutOfRange: true }
       ],
-      notes: 'Digitally printed diagnostic panel from MaxLab Diagnostics. Extracted automatically with high optical confidence.'
+      notes: 'Digitally printed diagnostic panel from MaxLab Diagnostics.'
     }
   ],
   pastVisits: [
     {
-      date: '10 Aug 2024',
-      hospital: 'Safdarjung Hospital & VMMC, New Delhi',
-      department: 'General Internal Medicine (Room 102)',
-      reason: 'Routine checkup for BP, experiencing mild dizziness.',
+      date: '28 Aug 2024',
+      hospital: 'AIIMS New Delhi (Apex)',
+      department: 'Cardiology OPD (Room 12)',
+      reason: 'Severe exertional breathlessness and recurrent chest tightness.',
       diagnosis: 'Hypertensive crisis secondary to non-compliance',
       prescriptions: ['Tab Telmisartan 40mg OD', 'Tab Amlodipine 5mg OD'],
       patientVisibleNotes: 'Please take your BP medicines regularly. Cut down salt intake to less than 1 tsp per day. Follow up in 1 month with lipid profile.',
@@ -806,7 +819,13 @@ export const getFreshDemoProfile = (): PatientProfile => ({
 });
 
 export const mockProfiles: Record<string, PatientProfile> = {
-  '9811223344': getFreshDemoProfile()
+  '9811223344': getFreshDemoProfile(),
+  ...DEMO_PRESET_PATIENTS.reduce((acc, item) => {
+    if (item.personaProfile) {
+      acc[item.personaProfile.phone] = item.personaProfile;
+    }
+    return acc;
+  }, {} as Record<string, PatientProfile>)
 };
 
 function broadcastSync(event: { type: string; [key: string]: any }) {
@@ -1376,6 +1395,50 @@ export const usePatientStore = create<PatientStore>((set, get) => ({
     } catch (e) {
       console.warn('Supabase Realtime:', e);
     }
+  },
+
+  populateDemoPatients: () => {
+    const four = getFourActiveDemoPatients();
+    four.forEach((p) => {
+      mockDatabase[p.token] = { ...p, status: 'waiting' };
+      syncPatientToSupabase(mockDatabase[p.token]);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('medikiosk_p_' + p.token, JSON.stringify(mockDatabase[p.token]));
+        } catch (e) {}
+      }
+    });
+    broadcastSync({ type: 'DEMO_POPULATED' });
+    set((state) => ({ queueTrigger: state.queueTrigger + 1 }));
+  },
+
+  clearActiveQueueToRelieved: () => {
+    Object.keys(mockDatabase).forEach((tok) => {
+      if (mockDatabase[tok].status !== 'admitted') {
+        mockDatabase[tok].status = 'accepted';
+        syncPatientToSupabase(mockDatabase[tok]);
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('medikiosk_p_' + tok, JSON.stringify(mockDatabase[tok]));
+          } catch (e) {}
+        }
+      }
+    });
+    broadcastSync({ type: 'QUEUE_CLEARED' });
+    set((state) => ({ queueTrigger: state.queueTrigger + 1 }));
+  },
+
+  injectCustomPatient: (patient: PatientData) => {
+    mockDatabase[patient.token] = { ...patient };
+    syncPatientToSupabase(mockDatabase[patient.token]);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('medikiosk_p_' + patient.token, JSON.stringify(mockDatabase[patient.token]));
+        localStorage.setItem('medikiosk_latest_patient', JSON.stringify(mockDatabase[patient.token]));
+      } catch (e) {}
+    }
+    broadcastSync({ type: 'PATIENT_SAVED', patient: mockDatabase[patient.token] });
+    set((state) => ({ queueTrigger: state.queueTrigger + 1 }));
   }
 }));
 

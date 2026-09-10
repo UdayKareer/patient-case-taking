@@ -4,7 +4,8 @@ import DoctorSidebar, { type DoctorNavTab } from './DoctorSidebar';
 import {
   Menu,
   X,
-  Zap
+  Zap,
+  Sliders
 } from 'lucide-react';
 import { mockDatabase, usePatientStore } from '../store/usePatientStore';
 
@@ -107,6 +108,16 @@ export default function DoctorLayout() {
                 <span>{emergencyCount} Critical Triage Cases</span>
               </button>
             )}
+
+            <button
+              onClick={() => navigate('/demo')}
+              className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-full text-xs font-bold shadow-2xs transition-all active:scale-95"
+              title="Open Demo & Patient Simulation Control Hub"
+            >
+              <Sliders size={12} />
+              <span className="hidden sm:inline">Demo Control Hub</span>
+              <span className="sm:hidden">Demo</span>
+            </button>
 
             <div className="h-4 w-px bg-slate-200 hidden sm:block" />
 

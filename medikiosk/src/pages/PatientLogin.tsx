@@ -13,12 +13,6 @@ export default function PatientLogin() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [regData, setRegData] = useState({ name: '', age: '', gender: 'Male' });
 
-  const handleQuickDemoLogin = () => {
-    resetDemoSession();
-    loginProfile('9811223344');
-    navigate('/patient/dashboard');
-  };
-
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginId.trim()) return;
@@ -164,18 +158,77 @@ export default function PatientLogin() {
           <span className="text-[11px] text-slate-400 font-mono">256-bit SSL</span>
         </div>
         
-        {/* Demo Helper */}
+        {/* Demo Helper & Multi-Persona Selector */}
         {!isRegistering && (
-          <div className="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500 font-medium">Demo / Presentation:</span>
-            <button
-              type="button"
-              onClick={handleQuickDemoLogin}
-              className="px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <Sparkles size={12} className="text-amber-500" />
-              <span>Use Demo (9811223344)</span>
-            </button>
+          <div className="mt-4 pt-3.5 border-t border-slate-100 space-y-2.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-600 font-bold flex items-center gap-1.5">
+                <Sparkles size={13} className="text-amber-500" />
+                <span>Demo Personas (1-Click):</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => navigate('/demo')}
+                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+              >
+                <span>Demo Control Hub</span>
+                <ArrowRight size={11} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  resetDemoSession();
+                  loginProfile('9811223344');
+                  navigate('/patient/dashboard');
+                }}
+                className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200/90 hover:border-blue-300 text-left transition-all shadow-2xs group"
+              >
+                <div className="font-bold text-slate-800 text-[11px] group-hover:text-blue-700">#1 Ramesh Kumar</div>
+                <div className="text-[10px] text-red-600 font-mono font-medium">9811223344 • Cardiac</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  resetDemoSession();
+                  loginProfile('9844332211');
+                  navigate('/patient/dashboard');
+                }}
+                className="p-2 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-200/90 hover:border-emerald-300 text-left transition-all shadow-2xs group"
+              >
+                <div className="font-bold text-slate-800 text-[11px] group-hover:text-emerald-700">#2 Sunita Devi</div>
+                <div className="text-[10px] text-emerald-700 font-mono font-medium">9844332211 • AYUSH</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  resetDemoSession();
+                  loginProfile('9765432100');
+                  navigate('/patient/dashboard');
+                }}
+                className="p-2 rounded-xl bg-slate-50 hover:bg-amber-50 border border-slate-200/90 hover:border-amber-300 text-left transition-all shadow-2xs group"
+              >
+                <div className="font-bold text-slate-800 text-[11px] group-hover:text-amber-700">#3 Aarav Patel</div>
+                <div className="text-[10px] text-amber-700 font-mono font-medium">9765432100 • Asthma</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  resetDemoSession();
+                  loginProfile('9833445566');
+                  navigate('/patient/dashboard');
+                }}
+                className="p-2 rounded-xl bg-slate-50 hover:bg-purple-50 border border-slate-200/90 hover:border-purple-300 text-left transition-all shadow-2xs group"
+              >
+                <div className="font-bold text-slate-800 text-[11px] group-hover:text-purple-700">#4 Pooja Mehra</div>
+                <div className="text-[10px] text-purple-700 font-mono font-medium">9833445566 • Migraine</div>
+              </button>
+            </div>
           </div>
         )}
       </div>

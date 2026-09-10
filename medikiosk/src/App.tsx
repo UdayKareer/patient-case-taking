@@ -8,6 +8,7 @@ import DoctorDashboard from './pages/DoctorDashboard';
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import DoctorLayout from './components/DoctorLayout';
+import DemoControlHub from './pages/DemoControlHub';
 
 const ProtectedDoctorRoute = ({ children }: { children: React.ReactNode }) => {
   const isLoggedIn = sessionStorage.getItem('doctor_logged_in') === 'true';
@@ -45,6 +46,10 @@ function App() {
         >
           <Route index element={<DoctorDashboard />} />
         </Route>
+
+        {/* Standalone Demo & Presentation Simulator Hub */}
+        <Route path="/demo" element={<DemoControlHub />} />
+        <Route path="/doctor/demo" element={<Navigate to="/demo" replace />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
