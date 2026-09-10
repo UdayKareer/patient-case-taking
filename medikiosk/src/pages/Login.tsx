@@ -81,7 +81,7 @@ export default function Login() {
           </form>
 
           <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 text-center">
-            Demo credentials: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">doctor / admin</code>
+            Clinical Workstation: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">doctor / admin</code>
           </div>
         </div>
         

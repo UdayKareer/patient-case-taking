@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 import {
   Search,
   AlertTriangle,
@@ -33,7 +33,6 @@ import {
   Edit3,
   X,
   RotateCcw,
-  Sliders,
   ArrowRight
 } from 'lucide-react';
 import { usePatientStore, mockDatabase, mockProfiles, type PatientData, type IpdMedication, type IpdProgressNote, type UploadedDocument, syncPatientToSupabase } from '../store/usePatientStore';
@@ -110,7 +109,6 @@ export function formatWaitTime(totalSeconds: number): string {
 }
 
 export default function DoctorDashboard() {
-  const navigate = useNavigate();
   const { activeTab, setActiveTab } = useOutletContext<DoctorOutletContext>() || {
     activeTab: 'consultation',
     setActiveTab: () => {},
@@ -121,8 +119,7 @@ export default function DoctorDashboard() {
     initSocket,
     clearQueue,
     addDocumentToPatient,
-    updatePatientIntegrativeExam,
-    populateDemoPatients
+    updatePatientIntegrativeExam
   } = usePatientStore();
   const queueTrigger = usePatientStore((state) => state.queueTrigger);
 
@@ -1143,14 +1140,14 @@ export default function DoctorDashboard() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <button
                 onClick={() => {
-                  if (window.confirm("Are you sure you want to clear all demo patients from the queue and cloud database?")) {
+                  if (window.confirm("Are you sure you want to reset the OPD live queue?")) {
                     clearQueue();
                     window.location.reload();
                   }
                 }}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 transition-colors shadow-2xs flex items-center gap-1.5 border border-red-200"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 transition-colors shadow-2xs flex items-center gap-1.5 border border-red-200 cursor-pointer"
               >
-                <Trash2 size={13} /> Clear Demo Queue
+                <Trash2 size={13} /> Reset OPD Queue
               </button>
               
               <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-semibold">
@@ -1843,33 +1840,10 @@ export default function DoctorDashboard() {
               {/* Patient List Cards */}
               <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
                 {sortedActivePatients.length === 0 ? (
-                  <div className="py-7 px-3 text-center text-slate-400 space-y-2 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                    <CheckCircle2 size={22} className="mx-auto text-emerald-600" />
+                  <div className="py-8 text-center text-slate-400 space-y-1.5 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    <CheckCircle2 size={20} className="mx-auto text-emerald-600" />
                     <p className="text-xs font-bold text-slate-700">Queue Clear</p>
-                    <p className="text-[10px] text-slate-400 leading-tight">All registered patients have been relieved.</p>
-                    <button
-                      onClick={() => {
-                        populateDemoPatients();
-                        const first = mockDatabase['EMG-911'] || Object.values(mockDatabase)[0];
-                        if (first) {
-                          setInspectingRelievedToken(null);
-                          handleSelectPatient(first);
-                        }
-                        setStatusMessage('⚡ 4 Diverse Demo Patients loaded into live queue.');
-                        setTimeout(() => setStatusMessage(''), 3500);
-                      }}
-                      className="mt-2 w-full py-1.5 px-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold shadow-2xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
-                    >
-                      <Zap size={12} className="fill-white" />
-                      <span>+4 Demo Patients</span>
-                    </button>
-                    <button
-                      onClick={() => navigate('/demo')}
-                      className="w-full py-1 text-[10px] font-bold text-teal-700 hover:text-teal-900 underline flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <span>Open Demo Hub</span>
-                      <ArrowRight size={10} />
-                    </button>
+                    <p className="text-[10px] text-slate-400">All registered patients have been relieved.</p>
                   </div>
                 ) : (
                   sortedActivePatients.map((p) => {
@@ -1982,51 +1956,6 @@ export default function DoctorDashboard() {
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">OPD Shift Status</div>
                     <div className="text-base font-black text-teal-700 mt-1">Ready</div>
                     <div className="text-[10px] text-slate-500 font-medium mt-0.5">Next Shift 14:00</div>
-                  </div>
-                </div>
-
-                {/* Presentation & Demo Controls Card */}
-                <div className="p-6 bg-gradient-to-br from-slate-900 via-slate-950 to-teal-950 rounded-2xl text-white text-left max-w-2xl mx-auto shadow-md border border-slate-800">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-800 pb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-xl bg-teal-500/20 text-teal-300">
-                        <Sparkles size={18} />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-white">Presentation & Live Demo Simulator</h3>
-                        <p className="text-[11px] text-slate-400">Instantly seed diverse clinical cases or manage demo credentials</p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-mono bg-teal-500/20 text-teal-300 px-2.5 py-1 rounded-md border border-teal-500/30 self-start sm:self-auto">
-                      Demo Ready
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      onClick={() => {
-                        populateDemoPatients();
-                        const first = mockDatabase['EMG-911'] || Object.values(mockDatabase)[0];
-                        if (first) {
-                          setInspectingRelievedToken(null);
-                          handleSelectPatient(first);
-                        }
-                        setStatusMessage('⚡ 4 Diverse Demo Patients loaded into live queue.');
-                        setTimeout(() => setStatusMessage(''), 3500);
-                      }}
-                      className="flex-1 sm:flex-initial px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 rounded-xl text-xs font-black transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                    >
-                      <Zap size={14} className="fill-slate-950" />
-                      <span>⚡ Quick-Add 4 Demo Patients</span>
-                    </button>
-
-                    <button
-                      onClick={() => navigate('/demo')}
-                      className="flex-1 sm:flex-initial px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 hover:border-teal-500/50 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Sliders size={14} className="text-teal-400" />
-                      <span>🎛️ Open Demo Control Hub (/demo)</span>
-                    </button>
                   </div>
                 </div>
 
