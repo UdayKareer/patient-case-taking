@@ -6,7 +6,7 @@ import {
   X,
   Zap
 } from 'lucide-react';
-import { mockDatabase } from '../store/usePatientStore';
+import { mockDatabase, usePatientStore } from '../store/usePatientStore';
 
 export interface DoctorOutletContext {
   activeTab: DoctorNavTab;
@@ -15,6 +15,7 @@ export interface DoctorOutletContext {
 
 export default function DoctorLayout() {
   const navigate = useNavigate();
+  const { currentPatient } = usePatientStore();
   const [activeTab, setActiveTab] = useState<DoctorNavTab>('consultation');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -81,7 +82,9 @@ export default function DoctorLayout() {
             </button>
 
             <div className="flex items-center gap-2 text-xs">
-              <span className="font-semibold text-slate-400">AIIMS OPD</span>
+              <span className="font-semibold text-slate-400">
+                {currentPatient.hospitalName ? `${currentPatient.hospitalName} OPD` : 'Hospital OPD'}
+              </span>
               <span className="text-slate-300">/</span>
               <span className="font-bold text-slate-800 uppercase tracking-wide">
                 {activeTab === 'consultation' && 'Active Chart & SOAP'}

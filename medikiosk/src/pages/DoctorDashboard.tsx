@@ -1009,45 +1009,44 @@ export default function DoctorDashboard() {
         </div>
       )}
 
-      {/* Network Connectivity & Offline Sync Status Bar (Rural Health Center Resilient Engine) */}
-      <div className={`p-2.5 px-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs ${
-        isNetworkOnline 
-          ? offlinePendingCount > 0 
+      {/* Network Connectivity & Offline Sync Status Bar (Rural Health Center Resilient Engine - shown only when offline or pending sync) */}
+      {(!isNetworkOnline || offlinePendingCount > 0) && (
+        <div className={`p-2.5 px-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs ${
+          offlinePendingCount > 0 
             ? 'bg-amber-50 border-amber-200 text-amber-900' 
-            : 'bg-emerald-50/80 border-emerald-200 text-emerald-900' 
-          : 'bg-amber-100 border-amber-300 text-amber-950 font-medium'
-      }`}>
-        <div className="flex items-center gap-2">
-          <span className={`w-2.5 h-2.5 rounded-full ${isNetworkOnline ? 'bg-emerald-500 animate-pulse' : 'bg-amber-600'}`} />
-          <span>
-            {isNetworkOnline ? (
-              <>
-                <strong className="font-bold">Cloud HIS Online (ABDM / Supabase)</strong>
-                {offlinePendingCount > 0 ? ` • ${offlinePendingCount} offline pending update(s) ready to sync` : ' • All records synchronized'}
-              </>
-            ) : (
-              <>
-                <strong className="font-bold">⚠️ Rural Offline Mode Active:</strong> Operating from local encrypted storage. All consultations, NAMASTE codes & prescriptions saved locally.
-              </>
+            : 'bg-amber-100 border-amber-300 text-amber-950 font-medium'
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-600" />
+            <span>
+              {offlinePendingCount > 0 ? (
+                <>
+                  <strong className="font-bold">Offline Queue Active:</strong> {offlinePendingCount} pending update(s) ready to sync
+                </>
+              ) : (
+                <>
+                  <strong className="font-bold">⚠️ Rural Offline Mode Active:</strong> Operating from local encrypted storage. All consultations, NAMASTE codes & prescriptions saved locally.
+                </>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {offlinePendingCount > 0 && (
+              <button
+                onClick={handleManualOfflineSync}
+                disabled={isSyncingOffline || !isNetworkOnline}
+                className="px-2.5 py-1 bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-white text-[11px] font-bold rounded-md flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+              >
+                <RefreshCw size={11} className={isSyncingOffline ? 'animate-spin' : ''} />
+                {isSyncingOffline ? 'Syncing...' : `Sync Queue (${offlinePendingCount})`}
+              </button>
             )}
-          </span>
+            <span className="text-[10px] text-slate-500 font-mono">
+              Auto-Sync on Reconnect
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {offlinePendingCount > 0 && (
-            <button
-              onClick={handleManualOfflineSync}
-              disabled={isSyncingOffline || !isNetworkOnline}
-              className="px-2.5 py-1 bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-white text-[11px] font-bold rounded-md flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-            >
-              <RefreshCw size={11} className={isSyncingOffline ? 'animate-spin' : ''} />
-              {isSyncingOffline ? 'Syncing...' : `Sync Queue (${offlinePendingCount})`}
-            </button>
-          )}
-          <span className="text-[10px] text-slate-500 font-mono">
-            {isNetworkOnline ? 'Direct Cloud Sync' : 'Auto-Sync on Reconnect'}
-          </span>
-        </div>
-      </div>
+      )}
 
       {/* OPD KPI Ticker Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1058,7 +1057,7 @@ export default function DoctorDashboard() {
 
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> Critical Red-Flags
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" /> Critical Red-Flags
           </div>
           <div className="text-xl font-black text-red-600 mt-0.5">
             {activeQueuePatients.filter(p => p.triageLevel === 'emergency').length} <span className="text-[11px] font-normal text-slate-400">High Risk</span>
@@ -1084,7 +1083,7 @@ export default function DoctorDashboard() {
           <div className="p-5 border-b border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-slate-900">OPD Live Queue Management</h2>
-              <p className="text-xs text-slate-500">Real-time status of patients waiting in AIIMS Medicine OPD corridor</p>
+              <p className="text-xs text-slate-500">Real-time status of patients waiting in Medicine OPD corridor</p>
             </div>
 
             {/* Filter Tabs and Actions */}
