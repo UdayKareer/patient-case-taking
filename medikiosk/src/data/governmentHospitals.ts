@@ -6188,17 +6188,40 @@ export function aiRecognizeDepartment(
     }
   }
 
-  // 4. Keyword-based Clinical Semantic Matching
+    // 4. Robust Semantic Department Matching (English & Hindi)
   let bestMatch: typeof hospital.defaultRooms[0] | null = null;
   let maxScore = 0;
+  
+  // Combine native keywords with our robust map
+  const robustMap: Record<string, string[]> = {
+    'general': ['fever', 'weakness', 'fatigue', 'headache', 'infection', 'बुखार', 'थकान', 'कमजोरी', 'सिरदर्द', 'तबीयत', 'सर्दी', 'general', 'diabetes', 'sugar'],
+    'ayush': ['acidity', 'gas', 'indigestion', 'constipation', 'ayush', 'ayurveda', 'pitta', 'vata', 'kapha', 'गैस', 'एसिडिटी', 'कब्ज', 'पाचन', 'आयुर्वेद', 'वात', 'पित्त', 'कफ', 'chronic'],
+    'cardio': ['chest', 'heart', 'bp', 'blood pressure', 'palpitation', 'angina', 'छाती', 'सीना', 'दिल', 'धड़कन', 'रक्तचाप', 'बीपी'],
+    'ortho': ['knee', 'joint', 'back', 'bone', 'fracture', 'spine', 'arthritis', 'घुटने', 'जोड़', 'कमर', 'हड्डी', 'दर्द', 'मोच', 'muscle'],
+    'pulmo': ['cough', 'cold', 'asthma', 'breathing', 'wheezing', 'sputum', 'bronchitis', 'खांसी', 'सांस', 'दमा', 'बलगम', 'chest', 'lungs'],
+    'pediatric': ['child', 'infant', 'baby', 'pediatric', 'बच्चा', 'शिशु', 'बाल'],
+    'neuro': ['migraine', 'stroke', 'seizure', 'numbness', 'tingling', 'brain', 'चक्कर', 'सुन्न', 'झुनझुनी', 'दिमाग', 'मिर्गी', 'माइग्रेन', 'headache'],
+    'gastro': ['stomach', 'vomit', 'diarrhea', 'loose motion', 'abdomen', 'liver', 'पेट', 'उल्टी', 'दस्त', 'लीवर', 'acid', 'pain']
+  };
 
   for (const room of hospital.defaultRooms) {
     let score = 0;
+    const roomNameLower = room.dept.toLowerCase();
+    
+    // Check against standard keywords
     for (const kw of room.keywords) {
-      if (text.includes(kw)) {
-        score += 1;
+      if (text.includes(kw.toLowerCase())) score += 1;
+    }
+    
+    // Check against robust mapped keywords
+    for (const [key, synonyms] of Object.entries(robustMap)) {
+      if (roomNameLower.includes(key)) {
+        for (const syn of synonyms) {
+          if (text.includes(syn)) score += 2; // Extra weight for exact semantic match
+        }
       }
     }
+    
     if (score > maxScore) {
       maxScore = score;
       bestMatch = room;

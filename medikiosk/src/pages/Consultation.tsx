@@ -1091,7 +1091,7 @@ export default function Consultation() {
             <div className="text-center">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center justify-center gap-1.5 mb-1">
                 <Sparkles size={14} className="text-blue-600" />
-                {isHindi ? 'कदम 9: अतिरिक्त स्वास्थ्य विवरण' : 'Step 9: Additional Health Details'}
+                {isHindi ? 'कदम 8: अतिरिक्त स्वास्थ्य विवरण' : 'Step 8: Additional Health Details'}
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">
                 {t.stepFollowUp.title}
