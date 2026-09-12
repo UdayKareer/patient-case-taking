@@ -155,6 +155,7 @@ export interface PatientData {
   enableIntegrativeExam?: boolean;
   structuredSummary: StructuredSummary;
   doctorNotes: string;
+  prescriptions?: any[];
   primaryDiagnosis?: string;
   namasteCode?: string;
   status: 'waiting' | 'in_consultation' | 'accepted' | 'amended' | 'rejected' | 'admitted';

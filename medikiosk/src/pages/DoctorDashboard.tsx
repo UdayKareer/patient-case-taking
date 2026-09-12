@@ -676,7 +676,7 @@ export default function DoctorDashboard() {
     setDoctorNotes(patient.doctorNotes || '');
     setPrimaryDiagnosis(patient.primaryDiagnosis || '');
     setNamasteCode(patient.namasteCode || '');
-    setPrescribedMeds([]); // Reset prescription pad for new patient
+    setPrescribedMeds(patient.prescriptions || []); // Load prescription if already relieved, else reset
     setStatusMessage('');
     if (patient.status === 'accepted') {
       setInspectingRelievedToken(patient.token);
@@ -754,6 +754,7 @@ export default function DoctorDashboard() {
       doctorNotes,
       primaryDiagnosis: primaryDiagnosis || selectedPatient.primaryDiagnosis,
       namasteCode: namasteCode || selectedPatient.namasteCode,
+      prescriptions: prescribedMeds, // Save prescriptions to patient history
     };
     if (mockDatabase[updated.token]) {
       mockDatabase[updated.token] = updated;
@@ -762,21 +763,36 @@ export default function DoctorDashboard() {
     syncPatientToSupabase(updated);
     usePatientStore.getState().triggerQueueUpdate();
 
-    // Automatically advance to the next active patient in queue
-    const remainingActive = Object.values(mockDatabase).filter(
-      p => p.token !== updated.token && p.status !== 'accepted' && p.status !== 'admitted'
-    );
-    if (remainingActive.length > 0) {
-      setInspectingRelievedToken(null);
-      handleSelectPatient(remainingActive[0]);
-    } else {
-      // All active patients in queue are now relieved!
-      setSelectedPatient(updated);
-      setInspectingRelievedToken(null);
-    }
+    // Do NOT auto-advance immediately. Update the selected patient to the 'accepted' status so the UI shows them as relieved,
+    // and show the summary modal so the doctor can see what they wrote.
+    setSelectedPatient(updated);
+    setInspectingRelievedToken(updated.token);
+    
+    // Trigger the prescription summary modal!
+    setShowPrescriptionModal(true);
 
-    setStatusMessage(`Patient ${updated.name} (Token: ${updated.token}) marked OPD Done & Relieved.`);
+    setStatusMessage(`Patient ${updated.name} (Token: ${updated.token}) marked OPD Done & Relieved. Summary saved to history.`);
     setTimeout(() => setStatusMessage(''), 3500);
+  };
+
+  // We need a function to auto-advance AFTER the modal is closed, if the patient is relieved.
+  const handleClosePrescriptionModal = () => {
+    setShowPrescriptionModal(false);
+    
+    // If the patient we are currently viewing was just relieved (and we are inspecting them),
+    // let's auto-advance to the next patient in the queue now that the summary is closed.
+    if (selectedPatient.status === 'accepted' && inspectingRelievedToken === selectedPatient.token) {
+      const remainingActive = Object.values(mockDatabase).filter(
+        p => p.token !== selectedPatient.token && p.status !== 'accepted' && p.status !== 'admitted'
+      );
+      if (remainingActive.length > 0) {
+        setInspectingRelievedToken(null);
+        handleSelectPatient(remainingActive[0]);
+      } else {
+        // Queue is completely done
+        setInspectingRelievedToken(null);
+      }
+    }
   };
 
   const handleAdmitPatient = () => {
@@ -4316,7 +4332,7 @@ export default function DoctorDashboard() {
           patient={selectedPatient}
           doctorNotes={doctorNotes}
           prescribedMeds={prescribedMeds}
-          onClose={() => setShowPrescriptionModal(false)}
+          onClose={handleClosePrescriptionModal}
         />
       )}
 
