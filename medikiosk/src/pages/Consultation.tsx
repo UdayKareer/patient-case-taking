@@ -65,6 +65,7 @@ export default function Consultation() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const [duration, setDuration] = useState(currentPatient.symptomDuration || '');
+  const [timing, setTiming] = useState(currentPatient.symptomTiming || '');
   const [site, setSite] = useState(currentPatient.symptomSite || '');
   const [character, setCharacter] = useState(currentPatient.symptomCharacter || '');
   const [radiation, setRadiation] = useState(currentPatient.symptomRadiation || '');
@@ -113,11 +114,11 @@ export default function Consultation() {
   const [isCalculatingEsi, setIsCalculatingEsi] = useState(false);
 
   // Steps: 9 for Modern Medicine (Step 0 to 8 including Gemini Adaptive Questioning), 5 for AYUSH
-  const totalSteps = isAyush ? 5 : 9;
+  const totalSteps = isAyush ? 14 : 10;
 
   // Determine Ayush Start node based on complaint
   useEffect(() => {
-    if (isAyush && currentStep === 1 && !ayushCompleted) {
+    if (isAyush && currentStep === 10 && !ayushCompleted) {
       let catId = 'gastro_ayush';
       for (const cat of CHIEF_COMPLAINT_PRESETS) {
         if (cat.commonComplaints.some(c => c.textEn === chiefComplaintText || c.textHi === chiefComplaintText)) {
@@ -305,6 +306,7 @@ export default function Consultation() {
     updatePatient({
       chiefComplaint: chiefComplaintText,
       symptomDuration: duration,
+      symptomTiming: timing,
       symptomSite: site,
       symptomCharacter: character,
       symptomRadiation: radiation,
@@ -337,6 +339,7 @@ export default function Consultation() {
           gender: currentPatient.gender,
           chiefComplaint: chiefComplaintText,
           symptomDuration: duration,
+      symptomTiming: timing,
           symptomSite: site,
           symptomCharacter: character,
           symptomRadiation: radiation,
@@ -401,13 +404,11 @@ export default function Consultation() {
     }
   };
 
+  
   const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep((prev) => prev - 1);
-    } else {
-      navigate('/patient/dashboard');
-    }
+    if (currentStep > 0) setCurrentStep(currentStep - 1);
   };
+
 
   // Auto-advance helper on option tap
   const pickAndAdvance = (setter: (val: any) => void, value: any) => {
@@ -478,11 +479,12 @@ export default function Consultation() {
               if (currentStep === 1) textToRead = t.stepDuration[domainKey].tts;
               else if (currentStep === 2) textToRead = t.stepCharacter[domainKey].tts;
               else if (currentStep === 3) textToRead = t.stepSiteRadiation[domainKey].tts;
-              else if (currentStep === 4) textToRead = t.stepSeverity.tts;
-              else if (currentStep === 5) textToRead = t.stepAssociated.tts;
-              else if (currentStep === 6) textToRead = t.stepAggravating.tts;
-              else if (currentStep === 7) textToRead = t.stepRelieving.tts;
-              else if (currentStep === 8) textToRead = t.stepFollowUp.tts;
+              else if (currentStep === 4) textToRead = isHindi ? 'कृपया समय और पैटर्न बताएं' : 'Please describe the timing and pattern of your symptoms.';
+              else if (currentStep === 5) textToRead = t.stepSeverity.tts;
+              else if (currentStep === 6) textToRead = t.stepAssociated.tts;
+              else if (currentStep === 7) textToRead = t.stepAggravating.tts;
+              else if (currentStep === 8) textToRead = t.stepRelieving.tts;
+              else if (currentStep === 9) textToRead = t.stepFollowUp.tts;
 
               speakPrompt(textToRead, currentPatient.language);
             }}
@@ -695,7 +697,7 @@ export default function Consultation() {
         )}
 
         {/* STEP 1: Onset & Duration */}
-        {currentStep === 1 && !isAyush && (
+        {currentStep === 1 && (
           <div className="animate-slide-up space-y-6">
             <div className="text-center">
               <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
@@ -748,7 +750,7 @@ export default function Consultation() {
         )}
 
         {/* STEP 2: Character of Discomfort */}
-        {currentStep === 2 && !isAyush && (
+        {currentStep === 2 && (
           <div className="animate-slide-up space-y-6">
             <div className="text-center">
               <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
@@ -801,7 +803,7 @@ export default function Consultation() {
         )}
 
         {/* STEP 3: Radiation / Affected Regions */}
-        {currentStep === 3 && !isAyush && (
+        {currentStep === 3 && (
           <div className="animate-slide-up space-y-6">
             <div className="text-center">
               <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
@@ -854,7 +856,61 @@ export default function Consultation() {
         )}
 
         {/* STEP 4: Severity Slider */}
-        {currentStep === 4 && !isAyush && (
+        
+        {/* STEP 4: Timing / Course */}
+        {currentStep === 4 && (
+          <div className="animate-slide-up space-y-6">
+            <div className="text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
+                {isHindi ? 'कदम 5: समय और पैटर्न' : 'Step 5: Timing & Pattern'}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                {isHindi ? 'यह लक्षण किस समय ज़्यादा महसूस होता है?' : 'When does this symptom mostly occur?'}
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
+              {(currentOptions.timing || []).map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => pickAndAdvance(setTiming, isHindi ? opt.labelHi : opt.labelEn)}
+                  className={`p-4 rounded-2xl border-2 text-sm sm:text-base font-bold transition-all text-center ${
+                    timing === (isHindi ? opt.labelHi : opt.labelEn)
+                      ? 'bg-teal-50 border-teal-600 text-teal-800 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-teal-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {isHindi ? opt.labelHi : opt.labelEn}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Input / Speech */}
+            <div className="max-w-lg mx-auto p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-2">
+              <input
+                type="text"
+                value={timing}
+                onChange={(e) => setTiming(e.target.value)}
+                placeholder={isHindi ? 'या अपना समय/पैटर्न टाइप करें...' : 'Or type / speak the exact timing...'}
+                className="flex-1 bg-transparent text-xs sm:text-sm font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => toggleVoice('timing', setTiming)}
+                className={`p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
+                  isListening && activeVoiceField === 'timing'
+                    ? 'bg-red-600 text-white animate-pulse'
+                    : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
+                }`}
+              >
+                <Mic size={15} />
+                <span className="hidden sm:inline">{isListening && activeVoiceField === 'timing' ? 'Listening' : 'Speak'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 5 && (
           <div className="animate-slide-up text-center space-y-6">
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
@@ -907,7 +963,7 @@ export default function Consultation() {
         )}
 
         {/* STEP 5: Associated Symptoms */}
-        {currentStep === 5 && !isAyush && (
+        {currentStep === 6 && (
           <div className="animate-slide-up space-y-6">
             <div className="text-center">
               <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
@@ -974,7 +1030,7 @@ export default function Consultation() {
         )}
 
         {/* STEP 6: Aggravating Factors */}
-        {currentStep === 6 && !isAyush && (
+        {currentStep === 7 && (
           <div className="animate-slide-up space-y-6">
             <div className="text-center">
               <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
@@ -1030,7 +1086,7 @@ export default function Consultation() {
         )}
 
         {/* STEP 7: Relieving Factors */}
-        {currentStep === 7 && !isAyush && (
+        {currentStep === 8 && (
           <div className="animate-slide-up space-y-6">
             <div className="text-center">
               <span className="text-xs font-bold uppercase tracking-wider text-teal-700 block mb-1">
@@ -1086,12 +1142,12 @@ export default function Consultation() {
         )}
 
         {/* STEP 8: Clinical Follow-up (Adaptive Questioning) */}
-        {currentStep === 8 && !isAyush && (
+        {currentStep === 9 && (
           <div className="animate-slide-up space-y-6">
             <div className="text-center">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center justify-center gap-1.5 mb-1">
                 <Sparkles size={14} className="text-blue-600" />
-                {isHindi ? 'कदम 8: अतिरिक्त स्वास्थ्य विवरण' : 'Step 8: Additional Health Details'}
+                {isHindi ? 'कदम 10: अतिरिक्त स्वास्थ्य विवरण' : 'Step 10: Additional Health Details'}
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">
                 {t.stepFollowUp.title}
@@ -1152,7 +1208,7 @@ export default function Consultation() {
         )}
 
         {/* STEP 1 (AYUSH): Dynamic Pariksha Question Tree */}
-        {currentStep === 1 && isAyush && (
+        {currentStep === 10 && isAyush && (
           <div className="animate-slide-up space-y-6">
             {!ayushCompleted ? (
               <div className="bg-emerald-50/50 rounded-xl p-6 sm:p-7 border border-emerald-200/90 shadow-xs">
@@ -1258,7 +1314,7 @@ export default function Consultation() {
         )}
 
         {/* STEP 2 (AYUSH): Ahara & Vihara */}
-        {currentStep === 2 && isAyush && (
+        {currentStep === 11 && isAyush && (
           <div className="animate-slide-up text-center space-y-6">
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 block mb-1">
@@ -1294,7 +1350,7 @@ export default function Consultation() {
         )}
 
         {/* STEP 3 (AYUSH): Nidra */}
-        {currentStep === 3 && isAyush && (
+        {currentStep === 12 && isAyush && (
           <div className="animate-slide-up text-center space-y-6">
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 block mb-1">
@@ -1329,7 +1385,7 @@ export default function Consultation() {
         )}
 
         {/* STEP 4 (AYUSH): Pre-Consultation Patient Intake & Lifestyle Review */}
-        {currentStep === 4 && isAyush && (
+        {currentStep === 13 && isAyush && (
           <div className="animate-slide-up space-y-5 max-w-2xl mx-auto text-left">
             <div className="text-center space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-1">
